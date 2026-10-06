@@ -1,0 +1,193 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-ink: #0f1117;
+  --color-ink-2: #13161e;
+  --color-ink-3: #0b0d12;
+  --color-surface: #191c26;
+  --color-surface-2: #1c2030;
+  --color-surface-3: #252a3c;
+  --color-line: #2a2f3d;
+  --color-line-strong: #3b4256;
+  --color-mist: #9ca3af;
+  --color-paper: #f5f7fb;
+  --color-signal: #3b82f6;
+  --color-signal-strong: #2563eb;
+  --color-signal-hover: #1d4ed8;
+  --color-signal-dim: #1e40af;
+  --color-signal-light: #60a5fa;
+  --color-signal-soft: #93c5fd;
+  --color-sky: #38bdf8;
+  --color-bot: #4f46e5;
+  --color-bot-hover: #4338ca;
+  --color-bot-accent: #7c3aed;
+  --color-bot-accent-hover: #6d28d9;
+  --color-amber: #fbbf24;
+  --color-amber-hover: #fcd34d;
+  --color-call: #10b981;
+  --color-call-hover: #34d399;
+  --color-put: #f43f5e;
+  --color-put-hover: #fb7185;
+  --color-put-soft: #fda4af;
+  --color-demo: #38bdf8;
+  --color-live: #fbbf24;
+  --color-danger: #f87171;
+  --color-warn: #fbbf24;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-signal) 35%, transparent);
+  color: var(--color-paper);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.sbb-grid {
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.sbb-glow {
+  background:
+    radial-gradient(900px 520px at 50% -12%, rgb(59 130 246 / 0.16), transparent 60%),
+    radial-gradient(700px 420px at 92% 18%, rgb(56 189 248 / 0.08), transparent 60%),
+    var(--color-ink);
+}
+
+.sbb-gradient {
+  background-image: linear-gradient(135deg, var(--color-signal-strong), var(--color-sky));
+}
+
+.sbb-gradient-text {
+  background-image: linear-gradient(135deg, var(--color-signal-light), var(--color-sky));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.sbb-cta-band {
+  background-image: linear-gradient(135deg, #1e40af 0%, #2563eb 45%, #4338ca 100%);
+}
+
+.sbb-accent-band {
+  background-image: linear-gradient(90deg, #1e3a8a 0%, #1d4ed8 50%, #1e3a8a 100%);
+}
+
+.sbb-accent-glow {
+  background-image: radial-gradient(120% 80% at 80% 20%, rgb(59 130 246 / 0.14), transparent 55%);
+}
+
+.sbb-marquee {
+  display: flex;
+  width: max-content;
+  animation: sbb-marquee 60s linear infinite;
+}
+
+.sbb-marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes sbb-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.sbb-fade-x {
+  mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.sbb-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+.sbb-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sbb-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 999px;
+}
+
+.sbb-panel {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04);
+}
+
+.sbb-chart {
+  background:
+    radial-gradient(800px 280px at 50% 0%, rgb(59 130 246 / 0.06), transparent 60%),
+    var(--color-ink-2);
+}

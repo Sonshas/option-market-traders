@@ -1,0 +1,800 @@
+{
+  "tagoption": {
+    "status": 200,
+    "finalUrl": "https://tagoption.ke/",
+    "title": "TagOption - Binary Trading Platform",
+    "body": {
+      "text": "Get the TagOption AppGet a better trading experienceDownload",
+      "font": "\"IBM Plex Sans\", system-ui, sans-serif",
+      "size": "16px",
+      "weight": "400",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgb(14, 14, 14)",
+      "bgImage": "none",
+      "radius": "0px",
+      "padding": "0px",
+      "lineHeight": "24px",
+      "letterSpacing": "normal"
+    },
+    "h1": {
+      "text": "Trading Made Easy, Trade Smart",
+      "font": "\"IBM Plex Sans\", system-ui, sans-serif",
+      "size": "72px",
+      "weight": "800",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "bgImage": "none",
+      "radius": "0px",
+      "padding": "0px",
+      "lineHeight": "72px",
+      "letterSpacing": "-1.8px"
+    },
+    "h2": {
+      "text": "Built for serious traders",
+      "font": "\"IBM Plex Sans\", system-ui, sans-serif",
+      "size": "44px",
+      "weight": "700",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "bgImage": "none",
+      "radius": "0px",
+      "padding": "0px",
+      "lineHeight": "36px",
+      "letterSpacing": "normal"
+    },
+    "p": {
+      "text": "Get the TagOption App",
+      "font": "\"IBM Plex Sans\", system-ui, sans-serif",
+      "size": "11px",
+      "weight": "700",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "bgImage": "none",
+      "radius": "0px",
+      "padding": "0px",
+      "lineHeight": "13.75px",
+      "letterSpacing": "normal"
+    },
+    "buttons": [
+      {
+        "text": "Download",
+        "bg": "rgb(255, 255, 255)",
+        "bgImage": "none",
+        "color": "rgb(37, 99, 235)",
+        "radius": "8px",
+        "padding": "6px 14px",
+        "weight": "800",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0,"
+      },
+      {
+        "text": "Get Started",
+        "bg": "rgb(59, 130, 246)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "8px",
+        "padding": "8px 16px",
+        "weight": "600",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(59, 130, 246, 0.25) 0px 10px 15px -3px, rgba(59"
+      },
+      {
+        "text": "Get Started — It's Free",
+        "bg": "rgb(59, 130, 246)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "12px",
+        "padding": "14px 28px",
+        "weight": "600",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(59, 130, 246, 0.25) 0px 20px 25px -5px, rgba(59"
+      },
+      {
+        "text": "Start Trading",
+        "bg": "rgb(59, 130, 246)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "12px",
+        "padding": "10px 0px",
+        "weight": "600",
+        "shadow": "rgba(59, 130, 246, 0.2) 0px 4px 16px 0px"
+      },
+      {
+        "text": "Create Free Account",
+        "bg": "rgb(255, 255, 255)",
+        "bgImage": "none",
+        "color": "rgb(59, 130, 246)",
+        "radius": "12px",
+        "padding": "14px 32px",
+        "weight": "600",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 20px 25px -5px, rgba(0, 0, 0,"
+      },
+      {
+        "text": "Download App",
+        "bg": "rgb(255, 255, 255)",
+        "bgImage": "none",
+        "color": "rgb(30, 64, 175)",
+        "radius": "12px",
+        "padding": "14px 28px",
+        "weight": "700",
+        "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.15) 0px 20px 25px -5px, rgba(0, 0, 0"
+      }
+    ],
+    "topBg": [
+      [
+        "rgba(255, 255, 255, 0.06)",
+        26
+      ],
+      [
+        "rgb(28, 32, 48)",
+        16
+      ],
+      [
+        "rgba(255, 255, 255, 0.04)",
+        8
+      ],
+      [
+        "rgb(244, 63, 94)",
+        5
+      ],
+      [
+        "rgb(16, 185, 129)",
+        4
+      ],
+      [
+        "rgb(59, 130, 246)",
+        3
+      ],
+      [
+        "rgb(247, 147, 26)",
+        3
+      ],
+      [
+        "rgb(98, 126, 234)",
+        3
+      ],
+      [
+        "rgb(85, 85, 85)",
+        3
+      ],
+      [
+        "rgb(212, 160, 23)",
+        3
+      ],
+      [
+        "rgb(227, 25, 55)",
+        3
+      ],
+      [
+        "rgb(0, 82, 180)",
+        3
+      ],
+      [
+        "rgb(153, 69, 255)",
+        3
+      ],
+      [
+        "rgb(200, 16, 46)",
+        3
+      ]
+    ],
+    "topColor": [
+      [
+        "rgb(255, 255, 255)",
+        297
+      ],
+      [
+        "rgb(251, 191, 36)",
+        60
+      ],
+      [
+        "rgb(59, 130, 246)",
+        55
+      ],
+      [
+        "rgb(107, 114, 128)",
+        49
+      ],
+      [
+        "rgb(156, 163, 175)",
+        30
+      ],
+      [
+        "rgb(209, 213, 219)",
+        29
+      ],
+      [
+        "rgb(16, 185, 129)",
+        20
+      ],
+      [
+        "rgba(255, 255, 255, 0.4)",
+        14
+      ],
+      [
+        "rgb(244, 63, 94)",
+        13
+      ],
+      [
+        "rgb(30, 64, 175)",
+        6
+      ],
+      [
+        "rgb(239, 68, 68)",
+        4
+      ],
+      [
+        "rgb(34, 197, 94)",
+        3
+      ],
+      [
+        "rgba(255, 255, 255, 0.8)",
+        3
+      ],
+      [
+        "rgb(245, 158, 11)",
+        2
+      ]
+    ],
+    "topBorder": [
+      [
+        "rgba(255, 255, 255, 0.07)",
+        21
+      ],
+      [
+        "rgba(255, 255, 255, 0.03)",
+        5
+      ],
+      [
+        "rgba(255, 255, 255, 0.06)",
+        4
+      ],
+      [
+        "rgb(229, 231, 235)",
+        4
+      ],
+      [
+        "rgba(255, 255, 255, 0.1)",
+        2
+      ],
+      [
+        "rgba(255, 255, 255, 0.2)",
+        2
+      ],
+      [
+        "rgba(59, 130, 246, 0.25)",
+        1
+      ],
+      [
+        "rgba(255, 255, 255, 0.25)",
+        1
+      ]
+    ],
+    "gradients": [
+      [
+        "linear-gradient(135deg, rgb(59, 130, 246), rgb(0, 212, 170))",
+        13
+      ],
+      [
+        "radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, rgba(0, 0, 0, 0) 70%)",
+        1
+      ],
+      [
+        "radial-gradient(circle, rgba(0, 212, 170, 0.08) 0%, rgba(0, 0, 0, 0) 70%)",
+        1
+      ],
+      [
+        "linear-gradient(135deg, rgba(59, 130, 246, 0.06), rgba(0, 212, 170, 0.04))",
+        1
+      ],
+      [
+        "linear-gradient(135deg, rgb(59, 130, 246), rgb(67, 56, 202))",
+        1
+      ],
+      [
+        "linear-gradient(135deg, rgb(30, 58, 138) 0%, rgb(37, 99, 235) 40%, rgb(14, 165, 233) 100%)",
+        1
+      ],
+      [
+        "linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03))",
+        1
+      ]
+    ],
+    "fonts": [
+      [
+        "\"IBM Plex Sans\", system-ui, sans-serif",
+        594
+      ]
+    ],
+    "sections": [
+      {
+        "tag": "NAV",
+        "heading": null,
+        "bg": "rgba(19, 22, 30, 0.85)",
+        "bgImage": "none",
+        "height": 57
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Trading Made Easy, Trade Smart",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 573
+      },
+      {
+        "tag": "SECTION",
+        "heading": null,
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 672
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Built for serious traders",
+        "bg": "rgb(25, 28, 38)",
+        "bgImage": "none",
+        "height": 693
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Three steps to your first trade",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 560
+      },
+      {
+        "tag": "SECTION",
+        "heading": null,
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "linear-gradient(135deg, rgba(59, 130, 246, 0.06), rgba(0, 212, 170, 0.04))",
+        "height": 262
+      },
+      {
+        "tag": "SECTION",
+        "heading": "What traders say",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 660
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Ready to start earning?",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 461
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Trade on the go",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 409
+      },
+      {
+        "tag": "FOOTER",
+        "heading": null,
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 89
+      }
+    ],
+    "rootVars": {
+      "--bg-dark": "#0e0e0e",
+      "--bg-card": "#151717",
+      "--bg-panel": "#1d1f1f",
+      "--bg-hover": "#242828",
+      "--accent": "#ff444f",
+      "--success": "#4bb4b3",
+      "--text-primary": "#fff",
+      "--text-secondary": "#c2c2c2",
+      "--text-muted": "#6e6e6e",
+      "--border": "#323738"
+    }
+  },
+  "tradewise": {
+    "status": 200,
+    "finalUrl": "https://tradewisebinary.com/",
+    "title": "TradeWiseBinary — Trade binary contracts your way",
+    "body": {
+      "text": "Skip to content\n\n  \n    \n      \n      \n    \n    \n      Tradi",
+      "font": "Inter, system-ui, sans-serif",
+      "size": "16px",
+      "weight": "400",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgb(0, 0, 0)",
+      "bgImage": "none",
+      "radius": "0px",
+      "padding": "0px",
+      "lineHeight": "24px",
+      "letterSpacing": "normal"
+    },
+    "h1": {
+      "text": "Trade binary contractsyour way",
+      "font": "Inter, system-ui, sans-serif",
+      "size": "76px",
+      "weight": "800",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "bgImage": "none",
+      "radius": "0px",
+      "padding": "0px",
+      "lineHeight": "71.44px",
+      "letterSpacing": "-3.42px"
+    },
+    "h2": {
+      "text": "Choose how you want to trade",
+      "font": "Inter, system-ui, sans-serif",
+      "size": "44px",
+      "weight": "700",
+      "color": "rgb(255, 255, 255)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "bgImage": "none",
+      "radius": "0px",
+      "padding": "0px",
+      "lineHeight": "66px",
+      "letterSpacing": "-1.76px"
+    },
+    "p": {
+      "text": "Last-digit binary",
+      "font": "Inter, system-ui, sans-serif",
+      "size": "13px",
+      "weight": "700",
+      "color": "rgb(249, 103, 11)",
+      "bg": "rgba(0, 0, 0, 0)",
+      "bgImage": "none",
+      "radius": "0px",
+      "padding": "0px",
+      "lineHeight": "19.5px",
+      "letterSpacing": "1.04px"
+    },
+    "buttons": [
+      {
+        "text": "Skip to content",
+        "bg": "rgb(249, 103, 11)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "999px",
+        "padding": "8px 14px",
+        "weight": "600",
+        "shadow": "none"
+      },
+      {
+        "text": "☰",
+        "bg": "rgb(23, 23, 23)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "999px",
+        "padding": "1px 6px",
+        "weight": "400",
+        "shadow": "none"
+      },
+      {
+        "text": "Create account",
+        "bg": "rgb(249, 103, 11)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "999px",
+        "padding": "0px 18px",
+        "weight": "600",
+        "shadow": "none"
+      },
+      {
+        "text": "Create account →",
+        "bg": "rgb(249, 103, 11)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "999px",
+        "padding": "0px 18px",
+        "weight": "600",
+        "shadow": "none"
+      },
+      {
+        "text": "1\n              \n                Choose ",
+        "bg": "rgb(23, 23, 23)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "16px",
+        "padding": "14px 16px",
+        "weight": "400",
+        "shadow": "rgba(249, 103, 11, 0.12) 0px 10px 28px 0px"
+      },
+      {
+        "text": "2\n              \n                Set you",
+        "bg": "rgb(23, 23, 23)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "16px",
+        "padding": "14px 16px",
+        "weight": "400",
+        "shadow": "none"
+      },
+      {
+        "text": "3\n              \n                Review ",
+        "bg": "rgb(23, 23, 23)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "16px",
+        "padding": "14px 16px",
+        "weight": "400",
+        "shadow": "none"
+      },
+      {
+        "text": "4\n              \n                Confirm",
+        "bg": "rgb(23, 23, 23)",
+        "bgImage": "none",
+        "color": "rgb(255, 255, 255)",
+        "radius": "16px",
+        "padding": "14px 16px",
+        "weight": "400",
+        "shadow": "none"
+      }
+    ],
+    "topBg": [
+      [
+        "rgb(249, 103, 11)",
+        20
+      ],
+      [
+        "rgb(23, 23, 23)",
+        20
+      ],
+      [
+        "rgb(42, 42, 42)",
+        18
+      ],
+      [
+        "rgb(31, 31, 31)",
+        7
+      ],
+      [
+        "rgb(26, 29, 34)",
+        7
+      ],
+      [
+        "rgb(12, 14, 18)",
+        4
+      ],
+      [
+        "rgb(17, 17, 17)",
+        3
+      ],
+      [
+        "rgb(255, 255, 255)",
+        2
+      ],
+      [
+        "rgb(10, 10, 10)",
+        1
+      ],
+      [
+        "rgba(249, 103, 11, 0.1)",
+        1
+      ],
+      [
+        "rgb(7, 8, 10)",
+        1
+      ]
+    ],
+    "topColor": [
+      [
+        "rgb(255, 255, 255)",
+        238
+      ],
+      [
+        "rgb(163, 154, 147)",
+        61
+      ],
+      [
+        "rgb(249, 103, 11)",
+        32
+      ],
+      [
+        "rgb(216, 208, 200)",
+        23
+      ],
+      [
+        "rgb(11, 11, 11)",
+        6
+      ],
+      [
+        "rgb(232, 226, 220)",
+        5
+      ],
+      [
+        "rgb(214, 214, 214)",
+        3
+      ],
+      [
+        "rgb(201, 194, 187)",
+        3
+      ],
+      [
+        "rgb(122, 114, 108)",
+        3
+      ],
+      [
+        "rgb(17, 17, 17)",
+        2
+      ],
+      [
+        "rgba(255, 255, 255, 0.88)",
+        1
+      ],
+      [
+        "rgba(255, 255, 255, 0.75)",
+        1
+      ]
+    ],
+    "topBorder": [
+      [
+        "rgb(42, 42, 42)",
+        33
+      ],
+      [
+        "rgb(34, 38, 44)",
+        6
+      ],
+      [
+        "rgb(58, 58, 58)",
+        2
+      ],
+      [
+        "rgb(249, 103, 11)",
+        2
+      ],
+      [
+        "rgba(249, 103, 11, 0.7)",
+        1
+      ],
+      [
+        "rgba(255, 255, 255, 0.45)",
+        1
+      ]
+    ],
+    "gradients": [
+      [
+        "radial-gradient(120% 80% at 80% 20%, rgba(249, 103, 11, 0.16), rgba(0, 0, 0, 0) 55%), none",
+        3
+      ],
+      [
+        "linear-gradient(90deg, rgb(249, 103, 11) 0%, rgb(255, 138, 61) 45%, rgb(249, 103, 11) 100%)",
+        1
+      ]
+    ],
+    "fonts": [
+      [
+        "Inter, system-ui, sans-serif",
+        374
+      ],
+      [
+        "Arial",
+        4
+      ]
+    ],
+    "sections": [
+      {
+        "tag": "HEADER",
+        "heading": null,
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 80
+      },
+      {
+        "tag": "NAV",
+        "heading": null,
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 21
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Trade binary contractsyour way",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 624
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Choose how you want to trade",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 471
+      },
+      {
+        "tag": "SECTION",
+        "heading": "See how a trade works",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 642
+      },
+      {
+        "tag": "SECTION",
+        "heading": "More tools. More control.",
+        "bg": "rgb(7, 8, 10)",
+        "bgImage": "none",
+        "height": 538
+      },
+      {
+        "tag": "SECTION",
+        "heading": "A trading platform designed to stay simple",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 455
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Your money, your way",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 593
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Get started in 3 simple steps",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 602
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Login, history, and limits you set.",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 375
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Trade responsibly",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 491
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Straight answers",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 704
+      },
+      {
+        "tag": "SECTION",
+        "heading": "Ready to explore TradeWiseBinary?",
+        "bg": "rgba(0, 0, 0, 0)",
+        "bgImage": "none",
+        "height": 421
+      },
+      {
+        "tag": "FOOTER",
+        "heading": null,
+        "bg": "rgb(17, 17, 17)",
+        "bgImage": "none",
+        "height": 284
+      }
+    ],
+    "rootVars": {
+      "--primary": "#F9670B",
+      "--primary-pressed": "#DE5C00",
+      "--page": "#f3f1ed",
+      "--card": "#ffffff",
+      "--elev": "#ffffff",
+      "--line": "#eeeeee",
+      "--text": "#121212",
+      "--muted": "#5c5854",
+      "--soft": "#7a726c",
+      "--success": "#22C55E",
+      "--danger": "#EF4444",
+      "--radius": "18px",
+      "--nav-link": "#3a3632",
+      "--nav-link-hover": "#121212",
+      "--nav-scrolled": "rgba(255,255,255,.94)",
+      "--nav-shadow": "0 12px 40px rgba(18,16,14,.08)",
+      "--ghost-border": "#ddd8d2",
+      "--ghost-color": "#121212",
+      "--lede": "#3a3632",
+      "--trust-bg": "#ebe8e3",
+      "--menu-panel": "#ffffff",
+      "--tab-color": "#121212",
+      "--cta-fine": "#E8E2DC",
+      "--foot-link": "#3a3632",
+      "--mobile-cta": "#ffffff",
+      "--footer": "#ffffff"
+    }
+  }
+}

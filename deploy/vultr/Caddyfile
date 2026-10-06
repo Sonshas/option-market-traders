@@ -1,0 +1,97 @@
+# Caddy config for optionmarkettraders.com on a Vultr Ubuntu VPS.
+# Installed to /etc/caddy/Caddyfile by setup-server.sh.
+# HTTPS certificates are obtained automatically (Let's Encrypt / ZeroSSL)
+# once DNS for both hostnames points at this server and ports 80/443 are open.
+
+{
+	# Optional: contact address for certificate expiry notices.
+	# email you@example.com
+}
+
+www.optionmarkettraders.com {
+	redir https://optionmarkettraders.com{uri} permanent
+}
+
+optionmarkettraders.com {
+	root * /var/www/optionmarkettraders/current
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	# Optional: Express API (apps/api, PORT=3001) if it is deployed on this server later.
+	# Its routes are /health and /market-data/*, so the /api prefix is stripped.
+	# Set CORS_ORIGIN=https://optionmarkettraders.com in apps/api/.env on the server and
+	# VITE_MARKET_DATA_API_URL=https://optionmarkettraders.com/api in the web build.
+	# handle_path /api/* {
+	# 	reverse_proxy localhost:3001
+	# }
+
+	# MegaPay webhook, shared with vastderiv-traders.com. Proxied to the Supabase Edge Function
+	# megapay-webhook, which processes OMT- deposits and forwards everything else to vastderiv.
+	# Must stay above the SPA fallback below.
+	handle /api/megapay/webhook {
+		rewrite * /functions/v1/megapay-webhook
+		reverse_proxy https://wkfyavcjjuyzvyeprklz.supabase.co {
+			header_up Host wkfyavcjjuyzvyeprklz.supabase.co
+		}
+	}
+
+	# Safaricom Daraja STK Push callback (CallBackURL), proxied to the Supabase Edge Function mpesa-callback.
+	# Must stay above the SPA fallback below and must never redirect or challenge Safaricom's POST.
+	handle /api/mpesa/callback {
+		rewrite * /functions/v1/mpesa-callback
+		reverse_proxy https://wkfyavcjjuyzvyeprklz.supabase.co {
+			header_up Host wkfyavcjjuyzvyeprklz.supabase.co
+		}
+	}
+
+	# Safaricom Daraja B2C (withdrawal payout) ResultURL and QueueTimeOutURL, proxied to the public Edge Function
+	# mpesa-b2c-result. Only used when WITHDRAWAL_MODE=daraja_b2c; harmless otherwise (unknown payloads are ignored).
+	handle /api/mpesa/b2c/result {
+		rewrite * /functions/v1/mpesa-b2c-result
+		reverse_proxy https://wkfyavcjjuyzvyeprklz.supabase.co {
+			header_up Host wkfyavcjjuyzvyeprklz.supabase.co
+		}
+	}
+	handle /api/mpesa/b2c/timeout {
+		rewrite * /functions/v1/mpesa-b2c-result?kind=timeout
+		reverse_proxy https://wkfyavcjjuyzvyeprklz.supabase.co {
+			header_up Host wkfyavcjjuyzvyeprklz.supabase.co
+		}
+	}
+
+	# Vite emits content-hashed filenames under /assets, so they can be cached forever.
+	# Landing media under /media carries a version or width in its filename; ship a new name instead
+	# of overwriting a file.
+	@assets path /assets/* /media/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# Caddy's built-in MIME table maps .webm to audio/webm; the landing hero ships video-only WebM.
+	@webm path *.webm
+	header @webm Content-Type video/webm
+
+	# Everything else (index.html, SPA deep links, favicon) is revalidated on every load
+	# so a new deploy is picked up immediately.
+	@notAssets not path /assets/* /media/*
+	header @notAssets Cache-Control "no-cache"
+
+	# Missing hashed assets and media should 404 rather than fall back to index.html.
+	handle /assets/* {
+		file_server
+	}
+	handle /media/* {
+		file_server
+	}
+
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}

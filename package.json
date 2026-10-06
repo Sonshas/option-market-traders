@@ -1,0 +1,22 @@
+{
+  "name": "smartbasebinary",
+  "private": true,
+  "version": "0.1.0",
+  "description": "SmartBaseBinary monorepo — web (Vite + React) and api (Express).",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"npm run dev -w @smartbasebinary/web\" \"npm run dev -w @smartbasebinary/api\"",
+    "dev:web": "npm run dev -w @smartbasebinary/web",
+    "dev:api": "npm run dev -w @smartbasebinary/api",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
