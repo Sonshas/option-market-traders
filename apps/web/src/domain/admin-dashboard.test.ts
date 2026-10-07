@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import webSource from './admin-dashboard.ts?raw'
 import denoSource from '../../../../supabase/functions/_shared/admin-dashboard.ts?raw'
-import withdrawServer from '../../../../supabase/functions/_shared/withdraw-server.ts?raw'
+import withdrawServer from '../../../../supabase/functions/_shared/payments/withdraw-server.ts?raw'
 import {
   DASHBOARD_STAFF_ROLES,
   collectedTotals,

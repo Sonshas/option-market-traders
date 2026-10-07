@@ -5,7 +5,8 @@ import {
   classifyMegapayStatus,
   parseMegapayConfig,
   type MegapayConfig,
-} from './megapay.ts'
+} from './payments/megapay.ts'
+import { depositFeesFromMap, mergeMegapayConfig, parseQuickAmounts, type SettingsMap } from './payments/payment-settings.ts'
 
 const MEGAPAY_BASE = 'https://megapay.co.ke/backend/v1'
 export const DEFAULT_VAST_WEBHOOK_URL = 'https://vastderiv-traders.com/api/megapay/webhook'
@@ -40,6 +41,31 @@ export function serverConfig(): ServerConfig {
   }
 }
 
+/** Prefer payment_settings rows; fall back to env secrets / defaults. */
+export async function loadPaymentSettingsMap(admin: SupabaseClient): Promise<SettingsMap> {
+  const { data, error } = await admin.from('payment_settings').select('key, value')
+  if (error) {
+    console.error('payment_settings load', error.message)
+    await recordSystemIssue(admin, { source: 'edge', area: 'payments', operation: 'payment_settings.load', code: error.code, message: error.message })
+    return {}
+  }
+  const map: SettingsMap = {}
+  for (const row of data ?? []) {
+    const key = String((row as { key?: unknown }).key ?? '')
+    if (!key) continue
+    map[key] = String((row as { value?: unknown }).value ?? '')
+  }
+  return map
+}
+
+export async function resolveServerConfig(admin: SupabaseClient): Promise<ServerConfig & { quickAmounts: number[] }> {
+  const base = serverConfig()
+  const map = await loadPaymentSettingsMap(admin)
+  const money = mergeMegapayConfig(base, map)
+  const deposit = depositFeesFromMap(map, base)
+  return { ...base, ...money, quickAmounts: parseQuickAmounts(deposit.quickAmounts) }
+}
+
 export function credentialsConfigured(cfg: ServerConfig): boolean {
   return Boolean(cfg.apiKey && cfg.email)
 }
@@ -48,6 +74,34 @@ export function adminClient(): SupabaseClient {
   return createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+}
+
+export interface SystemIssueInput {
+  source: 'web' | 'edge' | 'probe'
+  area: string
+  operation: string
+  code?: string | null
+  message: string
+  route?: string | null
+  userId?: string | null
+}
+
+/** Logs a backend failure for /admin/system. Never throws — logging must not break the caller. */
+export async function recordSystemIssue(admin: SupabaseClient, issue: SystemIssueInput): Promise<void> {
+  try {
+    const { error } = await admin.rpc('report_system_issue', {
+      p_source: issue.source,
+      p_area: issue.area,
+      p_operation: issue.operation,
+      p_code: issue.code ?? null,
+      p_message: issue.message,
+      p_route: issue.route ?? null,
+      p_user_id: issue.userId ?? null,
+    })
+    if (error) console.error('report_system_issue', error.code ?? 'error')
+  } catch (err) {
+    console.error('report_system_issue', err instanceof Error ? err.message : 'error')
+  }
 }
 
 export async function userFromRequest(admin: SupabaseClient, req: Request) {
@@ -123,7 +177,10 @@ async function failDeposit(admin: SupabaseClient, id: string, status: 'FAILED' |
     p_reason: reason,
     p_raw: raw ?? {},
   })
-  if (error) console.error('fail_megapay_deposit', id, error.message)
+  if (error) {
+    console.error('fail_megapay_deposit', id, error.message)
+    await recordSystemIssue(admin, { source: 'edge', area: 'deposits', operation: 'fail_megapay_deposit', code: error.code, message: error.message })
+  }
 }
 
 function isCreditable(d: DepositRow): boolean {
@@ -167,7 +224,10 @@ export async function reconcileDeposit(admin: SupabaseClient, cfg: ServerConfig,
         p_amount_kes: result.amountKes,
         p_raw: status.body,
       })
-      if (error) console.error('credit_megapay_deposit', deposit.id, error.message)
+      if (error) {
+        console.error('credit_megapay_deposit', deposit.id, error.message)
+        await recordSystemIssue(admin, { source: 'edge', area: 'deposits', operation: 'credit_megapay_deposit', code: error.code, message: error.message })
+      }
     }
   } else if ((result.outcome === 'failed' || result.outcome === 'cancelled') && pending) {
     await failDeposit(

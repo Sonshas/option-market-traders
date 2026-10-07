@@ -4,18 +4,18 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Badge, Button, Card, DataTable, EmptyState, Input, PageHeader, Select, Skeleton, Stat, Tabs } from '@/components/ui'
 import { useAccountMode } from '@/hooks/useAccountMode'
 import { useAuthSession } from '@/hooks/useAuth'
+import { usePracticeBook } from '@/hooks/usePracticeBook'
 import { useWallet, useWalletHistory, useWallets } from '@/hooks/useWallet'
-import { REAL_BALANCE_PLACEHOLDER, REAL_COMING_SOON, accountModeLabel, realDepositsEnabled, realWithdrawalsEnabled } from '@/domain/account'
+import { REAL_BALANCE_PLACEHOLDER, accountModeLabel, realWithdrawalsEnabled } from '@/domain/account'
 import { localPhoneDisplay, withdrawalStatusLabel } from '@/domain/withdrawals'
 import { formatMoney } from '@/lib/format'
 import { REAL_INTEGRATION } from '@/providers/config'
 import { paymentProvider } from '@/services/payment'
 import { AccountHistoryCharts } from '@/features/wallet/AccountHistoryCharts'
-import { RealDepositPanel } from '@/features/wallet/RealDepositPanel'
-import { RealWithdrawPanel } from '@/features/wallet/RealWithdrawPanel'
+import { PayoutWithdrawPanel } from '@/features/payout-desk/PayoutWithdrawPanel'
 
 export function WalletPanels() {
-  const { kind, setKind } = useAccountMode()
+  const { kind } = useAccountMode()
   const { isSignedIn } = useAuthSession()
   const { wallet, loading, balanceDisplay } = useWallet(kind)
   const { demoWallet, loading: walletsLoading, realBalanceDisplay } = useWallets()
@@ -23,32 +23,41 @@ export function WalletPanels() {
   const [tab, setTab] = useState('overview')
   const [amount, setAmount] = useState('25')
   const [method, setMethod] = useState('bank')
-  const [destination, setDestination] = useState('DEMO simulated destination')
   const [dialog, setDialog] = useState<'deposit' | 'withdraw' | null>(null)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | undefined>()
   const isDemo = kind === 'demo'
-  const realDepositsOn = realDepositsEnabled(REAL_INTEGRATION)
+  const { isPractice } = usePracticeBook()
   const realWithdrawalsOn = realWithdrawalsEnabled(REAL_INTEGRATION)
   const [params, setParams] = useSearchParams()
   const action = params.get('action')
 
   useEffect(() => {
     if (action !== 'deposit' && action !== 'withdraw') return
-    const allowed =
-      isDemo ||
-      (action === 'deposit' && realDepositsOn && isSignedIn) ||
-      (action === 'withdraw' && realWithdrawalsOn && isSignedIn)
-    if (allowed) {
+    if (isPractice && action === 'withdraw') {
+      openRealWithdraw()
+    } else if (isPractice) {
       setResult(null)
       setFormError(undefined)
-      setDialog(action)
+      setDialog('deposit')
     }
     const copy = new URLSearchParams(params)
     copy.delete('action')
     setParams(copy, { replace: true })
-  }, [action, isDemo, realDepositsOn, realWithdrawalsOn, isSignedIn, params, setParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per ?action= link
+  }, [action])
+
+  useEffect(() => {
+    if (!isPractice) setDialog(null)
+  }, [isPractice])
+
+  /** DEMO funds cannot be withdrawn; Withdraw pays out a remaining REAL balance. */
+  function openRealWithdraw() {
+    setResult(null)
+    setFormError(undefined)
+    setDialog(realWithdrawalsOn && isSignedIn ? 'withdraw' : null)
+  }
 
   async function submit() {
     const value = Number(amount)
@@ -56,16 +65,9 @@ export function WalletPanels() {
       setFormError('Enter an amount greater than zero.')
       return
     }
-    if (dialog === 'withdraw' && destination.trim().length < 4) {
-      setFormError('Enter a destination account, phone, or address.')
-      return
-    }
     setFormError(undefined)
     setBusy(true)
-    const next =
-      dialog === 'deposit'
-        ? await paymentProvider.requestDeposit({ amount: value, method, kind })
-        : await paymentProvider.requestWithdrawal({ amount: value, destination, kind })
+    const next = await paymentProvider.requestDeposit({ amount: value, method, kind })
     setResult(next.message)
     setBusy(false)
   }
@@ -107,8 +109,14 @@ export function WalletPanels() {
   return (
     <div>
       <PageHeader
-        title={isDemo ? 'DEMO Wallet' : 'REAL Wallet'}
-        subtitle={isDemo ? 'Virtual practice funds — not real money.' : undefined}
+        title={isPractice ? 'Practice Wallet' : isDemo ? 'DEMO Wallet' : 'REAL Wallet'}
+        subtitle={
+          isPractice
+            ? 'Practice only — separate virtual balance, no real money.'
+            : isDemo
+              ? 'Virtual practice funds — not real money.'
+              : undefined
+        }
         actions={<Badge tone={isDemo ? 'demo' : 'live'}>{accountModeLabel(kind)}</Badge>}
       />
 
@@ -137,65 +145,66 @@ export function WalletPanels() {
           </>
         ) : (
           <>
-            <Stat
-              label={isDemo ? 'DEMO Available' : 'Available'}
-              value={isDemo ? formatMoney(wallet?.availableBalance ?? null) : balanceDisplay}
-              hint={isDemo ? 'Virtual funds' : undefined}
-              tone={isDemo ? 'demo' : 'live'}
-            />
-            <button type="button" className="text-left" onClick={() => setKind('demo')}>
+            {isPractice ? (
               <Stat
-                label="Demo Balance"
-                value={formatMoney(demoWallet?.availableBalance ?? null)}
-                hint="DEMO ACCOUNT"
+                label="Practice Available"
+                value={formatMoney(wallet?.availableBalance ?? null)}
+                hint="Practice only · virtual funds"
                 tone="demo"
               />
-            </button>
-            <button type="button" className="text-left" onClick={() => setKind('real')}>
-              <Stat
-                label="Real Balance"
-                value={realBalanceDisplay ?? REAL_BALANCE_PLACEHOLDER}
-                hint="REAL ACCOUNT"
-                tone="live"
-              />
-            </button>
+            ) : (
+              <>
+                <Stat
+                  label={isDemo ? 'DEMO Available' : 'Available'}
+                  value={isDemo ? formatMoney(wallet?.availableBalance ?? null) : balanceDisplay}
+                  hint={isDemo ? 'Virtual funds' : undefined}
+                  tone={isDemo ? 'demo' : 'live'}
+                />
+                <Stat
+                  label="Demo Balance"
+                  value={formatMoney(demoWallet?.availableBalance ?? null)}
+                  hint="DEMO ACCOUNT"
+                  tone="demo"
+                />
+              </>
+            )}
+            <Stat
+              label="Remaining Real Balance"
+              value={realBalanceDisplay ?? REAL_BALANCE_PLACEHOLDER}
+              hint="Withdraw only · REAL trading has ended"
+              tone="live"
+            />
           </>
         )}
       </div>
       <div className="mt-4">
         <AccountHistoryCharts kind={kind} />
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Button
-          disabled={!isDemo && !(realDepositsOn && isSignedIn)}
-          onClick={() => {
-            setResult(null)
-            setFormError(undefined)
-            setDialog('deposit')
-          }}
-        >
-          {isDemo ? 'DEMO Deposit' : 'Deposit'}
-          {!isDemo && !realDepositsOn ? (
-            <span className="text-[10px] font-medium opacity-80">· {REAL_COMING_SOON}</span>
-          ) : null}
-          {!isDemo && realDepositsOn ? <span className="text-[10px] font-medium opacity-80">· M-Pesa</span> : null}
-        </Button>
-        <Button
-          variant="secondary"
-          disabled={!isDemo && !(realWithdrawalsOn && isSignedIn)}
-          data-testid="wallet-withdraw"
-          onClick={() => {
-            setResult(null)
-            setFormError(undefined)
-            setDialog('withdraw')
-          }}
-        >
-          {isDemo ? 'DEMO Withdrawal' : 'Withdraw'}
-          {!isDemo && realWithdrawalsOn ? <span className="text-[10px] font-medium opacity-80">· M-Pesa</span> : null}
-        </Button>
-      </div>
-      {!isDemo && dialog === 'deposit' ? <RealDepositPanel onClose={() => setDialog(null)} /> : null}
-      {!isDemo && dialog === 'withdraw' ? <RealWithdrawPanel onClose={() => setDialog(null)} /> : null}
+      {isPractice ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            data-testid="wallet-topup"
+            onClick={() => {
+              setResult(null)
+              setFormError(undefined)
+              setDialog('deposit')
+            }}
+          >
+            Practice Top up
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={!(realWithdrawalsOn && isSignedIn)}
+            data-testid="wallet-withdraw"
+            title="Withdraw your remaining REAL balance to M-Pesa"
+            onClick={openRealWithdraw}
+          >
+            Withdraw REAL balance
+            {realWithdrawalsOn ? <span className="text-[10px] font-medium opacity-80">· M-Pesa</span> : null}
+          </Button>
+        </div>
+      ) : null}
+      {isPractice && dialog === 'withdraw' ? <PayoutWithdrawPanel onClose={() => setDialog(null)} /> : null}
       <div className="mt-6">
         <Tabs
           value={tab}
@@ -254,9 +263,7 @@ export function WalletPanels() {
                   <p className="mt-2 text-sm text-mist">
                     {isDemo
                       ? 'Bank transfer, mobile money, and crypto forms credit DEMO virtual funds only.'
-                      : realDepositsOn
-                        ? 'M-Pesa (Safaricom) deposits in KES, credited to your REAL balance in USD. Withdrawals are paid to your M-Pesa number; the amount is held when you request and marked completed only once M-Pesa confirms the payout.'
-                        : 'Real deposit methods are coming soon.'}
+                      : 'Real deposits are closed.'}
                   </p>
                 </Card>
                 <Card>
@@ -276,21 +283,17 @@ export function WalletPanels() {
       </div>
 
       <ConfirmDialog
-        open={dialog !== null && isDemo}
-        title={dialog === 'deposit' ? 'DEMO Deposit' : 'DEMO Withdrawal'}
-        body={
-          dialog === 'deposit'
-            ? `Simulate a DEMO deposit of ${formatMoney(Number(amount) || null)} via ${method}. Virtual practice funds only — not real money.`
-            : `Simulate a DEMO withdrawal of ${formatMoney(Number(amount) || null)} to ${destination || 'an unspecified destination'}. No real funds will be sent.`
-        }
-        confirmLabel={dialog === 'deposit' ? 'Confirm DEMO deposit' : 'Confirm DEMO withdrawal'}
+        open={dialog === 'deposit' && isPractice}
+        title="Practice Top up"
+        body={`Add ${formatMoney(Number(amount) || null)} of virtual funds to your Practice balance. Not real money.`}
+        confirmLabel="Confirm Practice top up"
         loading={busy}
         resultMessage={result}
         onClose={() => setDialog(null)}
         onConfirm={() => void submit()}
       />
 
-      {dialog && isDemo ? (
+      {dialog === 'deposit' && isPractice ? (
         <Card className="mt-4">
           <form
             className="grid gap-3 sm:grid-cols-2"
@@ -305,22 +308,13 @@ export function WalletPanels() {
               min={1}
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              error={formError && dialog ? formError : undefined}
+              error={formError}
             />
-            {dialog === 'deposit' ? (
-              <Select label="Method" value={method} onChange={(e) => setMethod(e.target.value)}>
-                <option value="bank">Bank transfer (DEMO)</option>
-                <option value="mobile">Mobile money (DEMO)</option>
-                <option value="crypto">Crypto (DEMO)</option>
-              </Select>
-            ) : (
-              <Input
-                label="Destination (simulated)"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                placeholder="Account, phone, or address"
-              />
-            )}
+            <Select label="Method" value={method} onChange={(e) => setMethod(e.target.value)}>
+              <option value="bank">Bank transfer (DEMO)</option>
+              <option value="mobile">Mobile money (DEMO)</option>
+              <option value="crypto">Crypto (DEMO)</option>
+            </Select>
           </form>
         </Card>
       ) : null}

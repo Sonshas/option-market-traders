@@ -339,6 +339,10 @@ describe('T9: no account-mode banners', () => {
     /Prediction loaded:/,
     /BOT PICK/,
     /Auto direction/,
+    /demo-win-rate-notice/,
+    /DEMO_WIN_RATE_NOTICE/,
+    /PRACTICE_ONLY_NOTICE/,
+    /win about 95%/,
   ]
 
   it.each(Object.entries(sources))('%s has none of the removed banner strings', (_name, source) => {
@@ -353,12 +357,14 @@ describe('T9: no account-mode banners', () => {
   })
 })
 
-describe('Auto Trade cannot generate a prediction', () => {
-  it('has no random, scanner or alternate-pick code paths', () => {
+describe('Auto Trade picks', () => {
+  it('never scans; only DEMO self-picks EVEN / ODD', () => {
     for (const source of [autoTraderSource, autoTradeDomainSource, autoPanelSource]) {
-      expect(source).not.toMatch(/Math\.random|cryptoRandomInt|pickRandom|randomSymbol|randomContract|randomTarget|pickAutoParams/)
+      expect(source).not.toMatch(/cryptoRandomInt|pickRandom|randomSymbol|randomTarget|pickAutoParams/)
       expect(source).not.toMatch(/digit-scanner|bestScanPick|rankVolatilities|strongestSetup/)
     }
+    expect(autoTraderSource).toMatch(/mode === 'DEMO' && Boolean\(options\.selfPickSymbol\)/)
+    expect(autoPanelSource).toMatch(/selfPickSymbol: isReal \? null : symbol/)
   })
 })
 

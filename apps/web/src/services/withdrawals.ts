@@ -1,5 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { WithdrawalMode, WithdrawalStatus } from '@/domain/withdrawals'
+import { edgeErrorMessage, reportBackendIssue } from '@/services/system-issues'
 import { getSupabase } from '@/lib/supabase'
 import { notifyRealWalletChanged } from '@/lib/real-wallet-events'
 import type { Result } from '@/services/megapay'
@@ -68,16 +69,7 @@ export interface AdminWithdrawalList {
 }
 
 async function functionError(error: unknown, fallback = WITHDRAW_UNAVAILABLE): Promise<string> {
-  const context = (error as { context?: Response } | null)?.context
-  if (context && typeof context.json === 'function') {
-    try {
-      const body = (await context.clone().json()) as { error?: string; message?: string }
-      if (body.error || body.message) return String(body.error ?? body.message)
-    } catch {
-      // fall through
-    }
-  }
-  return fallback
+  return edgeErrorMessage(error, fallback, { area: 'withdrawals', operation: 'edge.withdraw' })
 }
 
 function str(value: unknown): string | null {
@@ -164,7 +156,8 @@ export const withdrawalService = {
     const client = getSupabase()
     if (!client) return { ok: false, error: WITHDRAW_UNAVAILABLE }
     const { data, error } = await client.from('withdrawals').select(MY_COLUMNS).eq('id', withdrawalId).maybeSingle()
-    if (error || !data) return { ok: false, error: error?.message ?? 'Withdrawal not found.' }
+    if (error) reportBackendIssue('withdrawals', 'withdrawals.read', error)
+    if (error || !data) return { ok: false, error: error ? WITHDRAW_UNAVAILABLE : 'Withdrawal not found.' }
     return { ok: true, data: mapWithdrawalState(data as unknown as Record<string, unknown>) }
   },
 

@@ -18,6 +18,7 @@ import {
   type ParsedAuthLink,
 } from '@/lib/auth-link'
 import { confirmEmailRedirectUrl, resetPasswordRedirectUrl } from '@/lib/auth-redirect'
+import { reportBackendIssue } from '@/services/system-issues'
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase'
 import { notConnected, okReal } from '@/providers/results'
 import type { AccountStatus, KycStatus, ProviderResult, User, UserRole } from '@/types'
@@ -49,7 +50,7 @@ function authNotConfigured<T>(data: T, message?: string): ProviderResult<T> {
   return notConnected(
     data,
     message ??
-      'Supabase Auth is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in apps/web/.env.',
+      'Sign-in is temporarily unavailable. Please try again later.',
     'NOT_CONNECTED',
     'real',
   )
@@ -117,6 +118,7 @@ async function hydrateUser(authUser: AuthUser): Promise<User> {
     .eq('id', authUser.id)
     .maybeSingle()
 
+  if (error) reportBackendIssue('auth', 'users.profile', error)
   if (error || !data) {
     return userFromAuthOnly(authUser)
   }
@@ -241,7 +243,7 @@ export const authService = {
         phone: stored?.phone,
         country: stored?.country,
       })
-      return okReal(getDemoSessionUser(), 'E2E auth bypass session started (local only — not Supabase).')
+      return okReal(getDemoSessionUser(), 'E2E auth bypass session started (local only).')
     }
     if (!isSupabaseConfigured) return authNotConfigured(null)
     if (!input.email.trim() || input.password.length < 8) {
@@ -261,7 +263,7 @@ export const authService = {
       return notConnected(null, plainAuthMessage(error.message), 'VALIDATION', 'real')
     }
     const user = await resolveSessionUser(data.session)
-    return okReal(user, `Signed in as ${user?.email ?? input.email}. Session persisted via Supabase Auth.`)
+    return okReal(user, `Signed in as ${user?.email ?? input.email}.`)
   },
 
   async signUp(input: {
@@ -286,7 +288,7 @@ export const authService = {
         phone: input.phone,
         country: input.country,
       })
-      return okReal(getDemoSessionUser(), 'E2E auth bypass account created (local only — not Supabase).')
+      return okReal(getDemoSessionUser(), 'E2E auth bypass account created (local only).')
     }
     if (!isSupabaseConfigured) return authNotConfigured(null)
     if (input.name.trim().length < 2 || !input.email.trim() || input.password.length < 8) {
@@ -444,7 +446,7 @@ export const authService = {
     const client = getSupabase()!
     const { data, error } = await client.auth.getSession()
     if (error) {
-      return notConnected(null, error.message, 'NOT_CONNECTED', 'real')
+      return notConnected(null, plainAuthMessage(error.message), 'NOT_CONNECTED', 'real')
     }
     const user = await resolveSessionUser(data.session)
     if (!user) {
@@ -469,7 +471,7 @@ export const authService = {
     const client = getSupabase()!
     const { error } = await client.auth.signOut()
     if (error) {
-      return notConnected(null, error.message, 'NOT_CONNECTED', 'real')
+      return notConnected(null, plainAuthMessage(error.message), 'NOT_CONNECTED', 'real')
     }
     return okReal(null, 'Signed out. DEMO local practice data is unchanged.')
   },

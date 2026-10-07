@@ -1,0 +1,15 @@
+# Append to %USERPROFILE%\.ssh\config (create the file if missing).
+# Replace VULTR_IPV4 with your server IPv4 from the Vultr dashboard.
+
+Host optionmarket-vultr
+  HostName VULTR_IPV4
+  User deploy
+  IdentityFile ~/.ssh/id_ed25519
+
+Host optionmarket-vultr-root
+  HostName VULTR_IPV4
+  User root
+  IdentityFile ~/.ssh/id_ed25519
+
+# Then: ssh optionmarket-vultr
+#       ssh optionmarket-vultr-root   # Caddyfile updates, apt upgrade

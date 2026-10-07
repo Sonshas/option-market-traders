@@ -37,7 +37,7 @@ export const walletService: WalletProvider = {
     return {
       status: 'ready' as const,
       connected: true,
-      message: 'DEMO wallets are local/simulated. REAL wallets read from Supabase when signed in.',
+      message: 'DEMO wallets are practice funds. REAL wallets load when you sign in.',
       data: [...demo.data, ...real.data],
       accountMode: 'demo' as const,
       isSimulated: true,

@@ -72,9 +72,9 @@ export const adminService = {
     await uiPause()
     return disconnected([
       { key: 'LIVE_TRADING_ENABLED', label: 'Live trading', value: 'not connected', note: 'Feature flag UI only.' },
-      { key: 'MARKET_DATA', label: 'Market data provider', value: 'binance public (when configured)', note: 'Charts/prices only — execution stays disabled.' },
+      { key: 'MARKET_DATA', label: 'Market data provider', value: 'live feed (when configured)', note: 'Charts/prices only.' },
       { key: 'PAYMENTS', label: 'Payments', value: 'not connected', note: 'No real-money rails.' },
-      { key: 'AUTH', label: 'Authentication', value: 'Supabase Auth', note: 'signUp / signInWithPassword / session restore wired.' },
+      { key: 'AUTH', label: 'Authentication', value: 'Connected', note: 'Sign-up, sign-in, and session restore.' },
     ])
   },
 

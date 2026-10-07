@@ -1,12 +1,13 @@
 import { calculateTradeResult } from '@/domain/digit-contracts'
 import type { ContractOption, ContractType } from '@/types'
 
-/** Digit Scanner: past-tick counts only (no percentages, no predictions). */
+/** Digit Scanner: past-tick counts only (no percentages, no predictions of the next tick). */
 
 export const SCANNER_DISCLAIMER =
   'Based on past ticks; digits are random and past frequency does not predict the next tick.'
 
-export const AI_SCANNER_NOTE = 'Based on recent Deriv tick counts. Past ticks do not predict future results.'
+export const AI_SCANNER_NOTE =
+  'Ranks volatilities by recent tick patterns for the selected contract (counts only). Past ticks do not predict the next tick.'
 
 export const AI_SCANNER_SAMPLES = [100, 500, 1000] as const
 
@@ -24,6 +25,10 @@ export interface DigitScan {
   overCount: number
   underCount: number
   equalCount: number
+  /** Ticks that would settle won under the platform settlement policy (for stats only). */
+  settlementWinCount: number
+  /** Ticks that would settle lost under the platform settlement policy (for stats only). */
+  settlementLossCount: number
 }
 
 export function scanDigits(digits: readonly number[], window: number, barrier = 5): DigitScan {
@@ -33,11 +38,15 @@ export function scanDigits(digits: readonly number[], window: number, barrier = 
   let over = 0
   let under = 0
   let equal = 0
+  let settlementWin = 0
+  let settlementLoss = 0
   let total = 0
   for (const digit of sample) {
     if (!Number.isInteger(digit) || digit < 0 || digit > 9) continue
     counts[digit]! += 1
     total += 1
+    if (digit <= 8) settlementWin += 1
+    else settlementLoss += 1
     if (calculateTradeResult('EVEN', null, digit) === 'WIN') even += 1
     if (calculateTradeResult('OVER', barrier, digit) === 'WIN') over += 1
     else if (calculateTradeResult('UNDER', barrier, digit) === 'WIN') under += 1
@@ -65,6 +74,8 @@ export function scanDigits(digits: readonly number[], window: number, barrier = 
     overCount: over,
     underCount: under,
     equalCount: equal,
+    settlementWinCount: settlementWin,
+    settlementLossCount: settlementLoss,
   }
 }
 
@@ -73,7 +84,7 @@ export function describeScan(scan: DigitScan): string {
   if (scan.sampleSize === 0) return 'No ticks yet'
   const hot = scan.hottest.map((d) => `${d} (${scan.ranked.find((r) => r.digit === d)!.count})`).join(', ')
   const cold = scan.coldest.map((d) => `${d} (${scan.ranked.find((r) => r.digit === d)!.count})`).join(', ')
-  return `Most frequent ${hot} · Least frequent ${cold} · Even ${scan.evenCount} · Odd ${scan.oddCount} · Over ${scan.barrier}: ${scan.overCount} · Under ${scan.barrier}: ${scan.underCount} · ${scan.sampleSize} ticks`
+  return `Most frequent ${hot} · Least frequent ${cold} · ${scan.sampleSize} ticks`
 }
 
 /** Strongest setup of one volatility for one contract type, from past-tick counts. */
@@ -83,7 +94,7 @@ export interface ScannerPick {
   contractOption: ContractOption
   selectedDigit: number | null
   barrier: number | null
-  /** Ticks in the sample on which this setup would have won. */
+  /** Ticks in the sample on which this setup would have won under natural contract rules. */
   hits: number
   /** Hits a uniform digit distribution would give for this sample size. */
   expected: number
@@ -108,18 +119,26 @@ function deviationOf(hits: number, n: number, p: number): number {
   return sd > 0 ? (hits - n * p) / sd : 0
 }
 
+function sumCounts(counts: number[], from: number, toExclusive: number): number {
+  let total = 0
+  for (let d = from; d < toExclusive; d += 1) total += counts[d] ?? 0
+  return total
+}
+
+/** Candidates ranked by natural EVEN/ODD/MATCH/DIFFER/OVER/UNDER hit counts (not settlement policy). */
 function candidatesFor(contractType: ContractType, counts: number[], n: number): Candidate[] {
   if (contractType === 'EVEN_ODD') {
-    const even = counts[0]! + counts[2]! + counts[4]! + counts[6]! + counts[8]!
+    const even = (counts[0] ?? 0) + (counts[2] ?? 0) + (counts[4] ?? 0) + (counts[6] ?? 0) + (counts[8] ?? 0)
+    const odd = n - even
     return [
       { contractOption: 'even', selectedDigit: null, barrier: null, hits: even, p: 0.5 },
-      { contractOption: 'odd', selectedDigit: null, barrier: null, hits: n - even, p: 0.5 },
+      { contractOption: 'odd', selectedDigit: null, barrier: null, hits: odd, p: 0.5 },
     ]
   }
   if (contractType === 'OVER_UNDER') {
     const out: Candidate[] = []
     for (let b = 0; b <= 9; b += 1) {
-      const under = counts.slice(0, b).reduce((sum, c) => sum + c, 0)
+      const under = sumCounts(counts, 0, b)
       const over = n - under - counts[b]!
       if (b <= 8) out.push({ contractOption: 'over', selectedDigit: null, barrier: b, hits: over, p: (9 - b) / 10 })
       if (b >= 1) out.push({ contractOption: 'under', selectedDigit: null, barrier: b, hits: under, p: b / 10 })

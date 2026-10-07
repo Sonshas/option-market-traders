@@ -1,4 +1,5 @@
 import { getSupabase } from '@/lib/supabase'
+import { edgeErrorMessage } from '@/services/system-issues'
 import type { ContractOption, ContractType } from '@/types'
 
 /** Server-side REAL trading config returned by the real-trade Edge Function (GET). */
@@ -63,16 +64,8 @@ let cachedConfig: { at: number; userId: string; value: RealTradingConfig } | nul
 
 async function errorMessage(error: unknown): Promise<string> {
   const context = (error as { context?: Response } | null)?.context
-  if (context && typeof context.json === 'function') {
-    if (context.status === 401) return SIGN_IN
-    try {
-      const body = (await context.clone().json()) as { error?: string }
-      if (body.error) return String(body.error)
-    } catch {
-      // fall through
-    }
-  }
-  return UNAVAILABLE
+  if (context?.status === 401) return SIGN_IN
+  return edgeErrorMessage(error, UNAVAILABLE, { area: 'trading', operation: 'edge.real_trade' })
 }
 
 /** Signed-in Supabase client, or null — REAL calls are never sent without a user session. */

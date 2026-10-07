@@ -8,6 +8,7 @@ import {
 } from '@/domain/digit-contracts'
 import { REAL_INTEGRATION } from '@/providers/config'
 import { notConnected, okReal } from '@/providers/results'
+import { reportBackendIssue } from '@/services/system-issues'
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase'
 import { notifyRealWalletChanged } from '@/lib/real-wallet-events'
 import { realTradingService, type RealTradeRow } from '@/services/real-trading'
@@ -138,7 +139,8 @@ async function fetchRealTrades(filter: 'open' | 'history' | 'one', tradeId?: str
 
   const { data, error } = await query
   if (error) {
-    return { ok: false as const, message: `REAL trades could not be loaded: ${error.message}`, rows: [] as Trade[] }
+    reportBackendIssue('trading', 'trades.read', error)
+    return { ok: false as const, message: `REAL trades could not be loaded. Please try again later.`, rows: [] as Trade[] }
   }
   const rows = ((data ?? []) as unknown as Array<TradeRow & { is_simulated: boolean }>)
     .filter((row) => !row.is_simulated)
@@ -197,7 +199,10 @@ export const realTradingProvider: TradingProvider = {
       const message = config.data.message ?? 'Real trading is paused right now.'
       return notConnected(unavailableQuote(message, input.stake), message, 'REAL_TRADING_UNAVAILABLE')
     }
-    const stakeError = validateRealStake(input.stake)
+    const stakeError = validateRealStake(input.stake, null, {
+      min: config.data.stakeMin,
+      max: config.data.stakeMax,
+    })
     const valid = !stakeError
     const selection = quoteSelection(input)
     const quote: ContractQuote = {
@@ -224,7 +229,14 @@ export const realTradingProvider: TradingProvider = {
     if (!isRealTradeSymbol(input.symbol)) {
       return notConnected(null, 'This market is not available for REAL trading.', 'VALIDATION')
     }
-    const invalid = validateContractSelection(input) ?? validateRealStake(input.stake)
+    const config = await realTradingService.getConfig()
+    if (!config.ok) return notConnected(null, config.error, 'REAL_TRADING_UNAVAILABLE')
+    if (!config.data.enabled) {
+      return notConnected(null, config.data.message ?? 'Real trading is paused right now.', 'REAL_TRADING_UNAVAILABLE')
+    }
+    const invalid =
+      validateContractSelection(input) ??
+      validateRealStake(input.stake, null, { min: config.data.stakeMin, max: config.data.stakeMax })
     if (invalid) return notConnected(null, invalid, 'VALIDATION')
 
     const result = await realTradingService.place({
@@ -246,8 +258,8 @@ export const realTradingProvider: TradingProvider = {
     return okReal(
       trade,
       trade.durationTicks != null
-        ? `Trade placed at ${trade.entryPrice ?? '—'}. Settles on the ${trade.durationTicks}${ordinalSuffix(trade.durationTicks)} Deriv tick after it opened.`
-        : `Trade placed at ${trade.entryPrice ?? '—'}. Settles on the first Deriv tick after expiry.`,
+        ? `Trade placed at ${trade.entryPrice ?? 'â€”'}. Settles on the ${trade.durationTicks}${ordinalSuffix(trade.durationTicks)} Deriv tick after it opened.`
+        : `Trade placed at ${trade.entryPrice ?? 'â€”'}. Settles on the first Deriv tick after expiry.`,
     )
   },
 
@@ -296,7 +308,8 @@ export const realTradingProvider: TradingProvider = {
       .eq('account_mode', 'real')
       .eq('is_simulated', false)
       .order('created_at', { ascending: false })
-    if (error) return notConnected([] as TradeResult[], `REAL settlements could not be loaded: ${error.message}`)
+    if (error) reportBackendIssue('trading', 'trade_settlements.read', error)
+    if (error) return notConnected([] as TradeResult[], `REAL settlements could not be loaded. Please try again later.`)
 
     const rows: TradeResult[] = (data ?? []).map((row) => ({
       tradeId: row.trade_id,

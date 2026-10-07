@@ -9,6 +9,7 @@ import {
   type DigitContractSelection,
 } from '@/domain/digit-contracts'
 import type { ScannerPick } from '@/domain/digit-scanner'
+import type { RandomDigitPick } from '@/domain/random-pick'
 import { shortMarketName } from '@/domain/market-sections'
 import type { ContractOption, ContractType } from '@/types'
 
@@ -77,6 +78,10 @@ export function scanResultFromPick(pick: ScannerPick, volatilityLabel: string, s
     scannedAt,
     sampleSize: pick.sampleSize,
   }
+}
+
+export function scanResultFromRandomPick(pick: RandomDigitPick, volatilityLabel: string, scannedAt: number, id: string): ScanResult {
+  return scanResultFromPick({ ...pick, hits: 0, expected: 0, sampleSize: 0, deviation: 0, countsLine: '' }, volatilityLabel, scannedAt, id)
 }
 
 /** Ticket selection that executes exactly this prediction. */

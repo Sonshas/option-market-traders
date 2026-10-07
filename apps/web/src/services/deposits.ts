@@ -43,6 +43,9 @@ export const depositService = {
       const fallback = await megapayService.getConfig()
       return fallback.ok ? { ok: true, data: { ...fallback.data, provider: 'megapay', paybill: null } } : fallback
     }
+    const quick = Array.isArray(data.quick_amounts)
+      ? data.quick_amounts.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
+      : undefined
     return {
       ok: true,
       data: {
@@ -52,6 +55,7 @@ export const depositService = {
         kesPerUsd: Number(data.kes_per_usd),
         minKes: Number(data.min_kes),
         maxKes: Number(data.max_kes),
+        quickAmounts: quick && quick.length ? quick : undefined,
         message: (data.message as string | null) ?? null,
       },
     }

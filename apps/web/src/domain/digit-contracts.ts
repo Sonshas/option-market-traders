@@ -1,5 +1,6 @@
 // Pure digit-contract rules shared by the DEMO engine, the REAL web client and the Supabase Edge Functions.
 // supabase/functions/_shared/digit-contracts.ts must stay byte-identical to this file (enforced by digit-contracts.test.ts).
+// Settlement win rate / payout pricing live in ./outcome/ (mirrored under supabase/functions/_shared/outcome/).
 
 export type DigitContractType = 'EVEN_ODD' | 'MATCH_DIFFER' | 'OVER_UNDER'
 export type DigitContractOption = 'even' | 'odd' | 'match' | 'differ' | 'over' | 'under'
@@ -13,8 +14,10 @@ export const DIGIT_CONTRACT_OPTIONS: Record<DigitContractType, DigitContractOpti
 
 /** Share of the fair price kept by the house on every contract (DEMO and REAL). */
 export const HOUSE_MARGIN = 0.05
-/** Highest profit rate any contract can have (MATCH, P = 0.1). */
-export const MAX_PAYOUT_RATE = 8.5
+/** Flat profit per $1 on a win for every winnable contract ($10 stake pays $19.00). */
+export const DIGIT_PAYOUT_RATE = 0.9
+/** Highest profit rate allowed by the engine. */
+export const MAX_PAYOUT_RATE = DIGIT_PAYOUT_RATE
 export const CANNOT_WIN_WARNING = 'This contract cannot win — 0% chance'
 
 export interface DigitContractSelection {
@@ -25,14 +28,20 @@ export interface DigitContractSelection {
 }
 
 /**
- * Winning digits out of 10 (P(win) × 10, an exact integer 0–9).
- * OVER b wins on digits strictly above b, UNDER b strictly below; the barrier digit itself loses.
+ * Winning digits out of 10 for pricing under natural contract rules
+ * (EVEN/ODD 5, MATCH 1, DIFFER 9, OVER 9−barrier, UNDER barrier).
  */
 export function winningDigitCount(selection: DigitContractSelection): number {
   if (selection.contractType === 'EVEN_ODD') return 5
-  if (selection.contractType === 'MATCH_DIFFER') return selection.contractOption === 'match' ? 1 : 9
-  const barrier = isValidDigit(selection.barrier) ? selection.barrier : 5
-  return selection.contractOption === 'over' ? 9 - barrier : barrier
+  if (selection.contractType === 'MATCH_DIFFER') {
+    return selection.contractOption === 'match' ? 1 : 9
+  }
+  if (selection.contractType === 'OVER_UNDER') {
+    const barrier = selection.barrier
+    if (typeof barrier !== 'number' || !Number.isInteger(barrier) || barrier < 0 || barrier > 9) return 0
+    return selection.contractOption === 'over' ? 9 - barrier : barrier
+  }
+  return 0
 }
 
 export function winProbability(selection: DigitContractSelection): number {
@@ -44,14 +53,11 @@ export function contractCanWin(selection: DigitContractSelection): boolean {
 }
 
 /**
- * Profit per $1 on a win: (1 − HOUSE_MARGIN) / P(win) − 1, rounded down to 4 decimals so the margin never
- * drops below 5%. Contracts that cannot win have rate 0.
- * Integer form with n winning digits: floor((95 − 10n) × 1000 / n) / 10000.
+ * Profit per $1 on a win: DIGIT_PAYOUT_RATE for every contract that can win
+ * (EVEN, ODD, MATCH, DIFFER, OVER, UNDER at any target), 0 when it cannot win.
  */
 export function digitPayoutRate(selection: DigitContractSelection): number {
-  const n = winningDigitCount(selection)
-  if (n <= 0) return 0
-  return Math.floor(((95 - 10 * n) * 1000) / n) / 10000
+  return contractCanWin(selection) ? DIGIT_PAYOUT_RATE : 0
 }
 
 /** Legacy time-based durations: still accepted for trades opened before tick durations and by old tabs. */
@@ -209,8 +215,7 @@ export function selectionTarget(selection: DigitContractSelection): number | nul
 }
 
 /**
- * The single WIN / LOSS rule for every digit contract (DEMO, REAL, Auto Trade, history, scanner).
- * public.settle_real_trade re-checks REAL outcomes with the same rule in SQL.
+ * Centralized WIN/LOSS engine for DEMO and REAL.
  * EVEN wins on 0/2/4/6/8, ODD on 1/3/5/7/9, MATCH on final = target, DIFFER on final ≠ target,
  * OVER on final > target, UNDER on final < target.
  */
@@ -237,6 +242,10 @@ export function calculateTradeResult(
   }
 }
 
+/**
+ * DEMO + REAL settlement: same natural contract rules as {@link calculateTradeResult}.
+ * public.settle_real_trade re-checks the same rule in SQL.
+ */
 export function settleDigitContract(input: {
   contractType: DigitContractType
   contractOption: DigitContractOption
@@ -247,13 +256,9 @@ export function settleDigitContract(input: {
   exitDigit?: number | null
 }): DigitOutcome {
   const digit = isValidDigit(input.exitDigit) ? input.exitDigit : lastDigitOfPrice(input.exitPrice)
-  const target =
-    input.contractType === 'MATCH_DIFFER'
-      ? (input.selectedDigit ?? 0)
-      : input.contractType === 'OVER_UNDER'
-        ? (input.barrier ?? 5)
-        : null
-  return calculateTradeResult(contractKindOf(input.contractOption), target, digit) === 'WIN' ? 'won' : 'lost'
+  const kind = contractKindOf(input.contractOption)
+  const target = selectionTarget(input)
+  return calculateTradeResult(kind, target, digit) === 'WIN' ? 'won' : 'lost'
 }
 
 /**
@@ -304,11 +309,17 @@ export function validateContractSelection(input: {
 }
 
 /** Returns an error message for a REAL stake, or null when it is acceptable. */
-export function validateRealStake(stake: unknown, availableBalance?: number | null): string | null {
+export function validateRealStake(
+  stake: unknown,
+  availableBalance?: number | null,
+  bounds?: { min?: number; max?: number },
+): string | null {
+  const min = bounds?.min ?? REAL_STAKE_MIN
+  const max = bounds?.max ?? REAL_STAKE_MAX
   if (typeof stake !== 'number' || !Number.isFinite(stake)) return 'Enter a stake amount.'
   if (Math.abs(Math.round(stake * 100) - stake * 100) > 1e-6) return 'Stake can have at most 2 decimal places.'
-  if (stake < REAL_STAKE_MIN) return `Minimum stake is $${REAL_STAKE_MIN}.`
-  if (stake > REAL_STAKE_MAX) return `Maximum stake is $${REAL_STAKE_MAX}.`
+  if (stake < min) return `Minimum stake is $${min}.`
+  if (stake > max) return `Maximum stake is $${max}.`
   if (availableBalance != null && stake > availableBalance) return 'Insufficient REAL balance for this stake.'
   return null
 }
@@ -334,6 +345,7 @@ const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9_-]{8,100}$/
 /** Validates an untrusted REAL trade request body (snake_case, as sent to the real-trade Edge Function). */
 export function validateRealTradeRequest(
   body: Record<string, unknown>,
+  bounds?: { stakeMin?: number; stakeMax?: number },
 ): { ok: true; value: RealTradeRequest } | { ok: false; error: string } {
   if (body.account_mode !== 'REAL') {
     return { ok: false, error: 'This order is not marked for the REAL account. Reload the page and try again.' }
@@ -350,7 +362,7 @@ export function validateRealTradeRequest(
     barrier: body.barrier,
   })
   if (selection) return { ok: false, error: selection }
-  const stakeError = validateRealStake(body.stake)
+  const stakeError = validateRealStake(body.stake, null, { min: bounds?.stakeMin, max: bounds?.stakeMax })
   if (stakeError) return { ok: false, error: stakeError }
   let durationTicks: number | null = null
   let durationMs: number | null = null

@@ -134,29 +134,6 @@ a {
   background-image: radial-gradient(120% 80% at 80% 20%, rgb(59 130 246 / 0.14), transparent 55%);
 }
 
-.sbb-marquee {
-  display: flex;
-  width: max-content;
-  animation: sbb-marquee 60s linear infinite;
-}
-
-.sbb-marquee:hover {
-  animation-play-state: paused;
-}
-
-@keyframes sbb-marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
-.sbb-fade-x {
-  mask-image: linear-gradient(to right, transparent, #000 6%, #000 94%, transparent);
-}
-
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
@@ -190,4 +167,24 @@ a {
   background:
     radial-gradient(800px 280px at 50% 0%, rgb(59 130 246 / 0.06), transparent 60%),
     var(--color-ink-2);
+}
+
+@keyframes sbb-pop {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+  }
+  70% {
+    opacity: 1;
+    scale: 1.12;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .sbb-pop {
+    animation: sbb-pop 280ms ease-out both;
+  }
 }

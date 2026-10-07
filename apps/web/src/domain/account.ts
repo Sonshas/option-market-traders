@@ -1,3 +1,4 @@
+import { practiceBookLabel } from '@/lib/practice-book'
 import type { AccountMode, RealAccountStatus, RealAccountView, RealCapabilityMap } from '@/types'
 
 export const DEMO_USER_ID = 'user_demo_local'
@@ -60,7 +61,7 @@ export function isRealMode(mode: AccountMode): boolean {
 }
 
 export function accountModeLabel(mode: AccountMode): string {
-  return ACCOUNT_MODE_LABEL[mode]
+  return mode === 'demo' ? practiceBookLabel() : ACCOUNT_MODE_LABEL[mode]
 }
 
 export function deriveRealStatus(capabilities: RealCapabilityMap): RealAccountStatus {

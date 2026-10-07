@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { Logo } from '@/components/brand/Logo'
 import { Badge } from '@/components/ui'
+import { SystemIssuesBanner } from '@/features/admin/SystemIssuesBanner'
 import { cn } from '@/lib/cn'
 import { ADMIN_NAV } from '@/lib/constants'
 
@@ -20,6 +21,7 @@ export function AdminLayout() {
           </NavLink>
         </div>
       </header>
+      <SystemIssuesBanner />
       <div className="flex min-h-[calc(100svh-56px)]">
         <nav className="hidden w-56 shrink-0 border-r border-line bg-ink-2 p-3 lg:block">
           <div className="flex flex-col gap-1">

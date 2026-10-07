@@ -7,6 +7,7 @@ import {
   buildRealAccountView,
 } from '@/domain/account'
 import { nowIso } from '@/lib/ids'
+import { reportBackendIssue } from '@/services/system-issues'
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase'
 import { REAL_INTEGRATION } from '@/providers/config'
 import { notConnected, okReal } from '@/providers/results'
@@ -115,7 +116,7 @@ function mapTxType(type: string): TransactionType {
 }
 
 /**
- * Real wallet provider — reads authoritative Supabase wallet/ledger rows (RLS).
+ * Real wallet provider â€” reads authoritative Supabase wallet/ledger rows (RLS).
  * Never invents balances. Mutating deposit/withdrawal completion stays unavailable
  * until a payment provider + privileged RPCs are configured.
  */
@@ -143,7 +144,7 @@ export const realWalletProvider: WalletProvider = {
     if (!session?.user) {
       return notConnected(
         emptyRealWallet(),
-        'REAL ACCOUNT — sign in to load your wallet from Supabase.',
+        'REAL ACCOUNT â€” sign in to load your wallet.',
         'NOT_CONNECTED',
       )
     }
@@ -151,12 +152,13 @@ export const realWalletProvider: WalletProvider = {
     const { data, error } = await readRealWalletRow(client, session.user.id)
 
     if (error) {
-      return notConnected(emptyRealWallet(), `REAL wallet read failed: ${error.message}`, 'NOT_CONNECTED')
+      reportBackendIssue('wallet', 'wallets.read', error)
+      return notConnected(emptyRealWallet(), `REAL wallet read failed. Please try again later.`, 'NOT_CONNECTED')
     }
     if (!data) {
       return notConnected(
         emptyRealWallet({ userId: session.user.id, status: 'empty' }),
-        'REAL ACCOUNT — no real wallet row yet (signup trigger may still be pending).',
+        'REAL ACCOUNT â€” no real wallet row yet (signup trigger may still be pending).',
         'NOT_CONNECTED',
       )
     }
@@ -171,7 +173,7 @@ export const realWalletProvider: WalletProvider = {
     const wallet = mapWallet(data)
     return okReal(
       wallet,
-      `REAL wallet from Supabase ledger (available ${wallet.availableBalance} ${wallet.currency}). Trading/payments remain gated.`,
+      `REAL wallet loaded (available ${wallet.availableBalance} ${wallet.currency}).`,
     )
   },
 
@@ -210,7 +212,8 @@ export const realWalletProvider: WalletProvider = {
       .order('created_at', { ascending: false })
 
     if (error) {
-      return notConnected([], `REAL transactions read failed: ${error.message}`)
+      reportBackendIssue('wallet', 'transactions.read', error)
+      return notConnected([], `REAL transactions read failed. Please try again later.`)
     }
 
     const rows: Transaction[] = (data ?? []).map((row) => ({
@@ -230,7 +233,7 @@ export const realWalletProvider: WalletProvider = {
       updatedAt: row.updated_at,
     }))
 
-    return okReal(rows, rows.length ? 'REAL transactions from Supabase.' : 'No REAL transactions yet.')
+    return okReal(rows, rows.length ? 'REAL transactions loaded.' : 'No REAL transactions yet.')
   },
 
   async listDeposits() {
@@ -256,7 +259,8 @@ export const realWalletProvider: WalletProvider = {
       .order('created_at', { ascending: false })
 
     if (error) {
-      return notConnected([], `REAL deposits read failed: ${error.message}`)
+      reportBackendIssue('wallet', 'deposits.read', error)
+      return notConnected([], `REAL deposits read failed. Please try again later.`)
     }
 
     const rows: Deposit[] = (data ?? []).map((row) => {
@@ -284,7 +288,7 @@ export const realWalletProvider: WalletProvider = {
       }
     })
 
-    return okReal(rows, rows.length ? 'REAL deposits from Supabase.' : 'No REAL deposits yet.')
+    return okReal(rows, rows.length ? 'REAL deposits loaded.' : 'No REAL deposits yet.')
   },
 
   async listWithdrawals() {
@@ -310,7 +314,8 @@ export const realWalletProvider: WalletProvider = {
       .order('created_at', { ascending: false })
 
     if (error) {
-      return notConnected([], `REAL withdrawals read failed: ${error.message}`)
+      reportBackendIssue('wallet', 'withdrawals.read', error)
+      return notConnected([], `REAL withdrawals read failed. Please try again later.`)
     }
 
     const rows: Withdrawal[] = (data ?? []).map((row) => ({
@@ -340,7 +345,7 @@ export const realWalletProvider: WalletProvider = {
       failedAt: row.failed_at,
     }))
 
-    return okReal(rows, rows.length ? 'REAL withdrawals from Supabase.' : 'No REAL withdrawals yet.')
+    return okReal(rows, rows.length ? 'REAL withdrawals loaded.' : 'No REAL withdrawals yet.')
   },
 
   async createDeposit(input) {

@@ -6,7 +6,7 @@ import {
   isWithdrawalAdmin,
   loadWithdrawal,
   userRole,
-  withdrawConfig,
+  resolveWithdrawConfig,
   type WithdrawalRow,
 } from '../_shared/withdraw-server.ts'
 
@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
       const { data: userRows } = await admin.from('users').select('id, email, name').in('id', userIds)
       for (const u of userRows ?? []) users.set(u.id, { email: u.email ?? null, name: u.name ?? null })
     }
-    const cfg = withdrawConfig()
+    const cfg = await resolveWithdrawConfig(admin)
     return json({
       mode: b2cActive(cfg) ? 'daraja_b2c' : 'manual',
       fee_kes: cfg.feeKes,

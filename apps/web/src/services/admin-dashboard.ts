@@ -104,7 +104,7 @@ function mapList(value: unknown, map: (raw: Record<string, unknown>) => Dashboar
 export const adminDashboardService = {
   async load(): Promise<Result<AdminDashboard>> {
     const client = getSupabase()
-    if (!client) return { ok: false, error: 'Supabase is not configured.' }
+    if (!client) return { ok: false, error: 'This service is temporarily unavailable.' }
     const { data, error } = await client.functions.invoke<Record<string, unknown>>(FUNCTION, {
       method: 'POST',
       body: { action: 'overview' },

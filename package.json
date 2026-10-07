@@ -10,6 +10,7 @@
     "dev": "concurrently -n web,api -c cyan,magenta \"npm run dev -w @smartbasebinary/web\" \"npm run dev -w @smartbasebinary/api\"",
     "dev:web": "npm run dev -w @smartbasebinary/web",
     "dev:api": "npm run dev -w @smartbasebinary/api",
+    "dev:payout": "npm run dev -w real-mpesa-withdraw",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },

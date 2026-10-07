@@ -1,30 +1,24 @@
 import { useEffect, useState } from 'react'
+import { AdminFeesPanel } from '@/features/admin/AdminFeesPanel'
 import { AdminTablePage } from '@/features/admin/AdminTables'
 import { RealAdminDashboard } from '@/features/admin/RealAdminDashboard'
 import { RealWithdrawalsAdmin } from '@/features/admin/RealWithdrawalsAdmin'
-import { Alert, Badge, Button, Card, PageHeader, Stat } from '@/components/ui'
+import { SystemHealthPanel } from '@/features/admin/SystemHealthPanel'
+import { AdminPayoutDeskPanel } from '@/features/payout-desk/AdminPayoutDeskPanel'
+import { Alert, Badge, Button, Card } from '@/components/ui'
 import { resetDemoState } from '@/lib/demo-store'
 import { clearDemoSession } from '@/lib/demo-session'
+import { AuditSection } from '@/features/admin/SuperAdminPanel'
 import { adminService } from '@/services/admin'
-import type { AuditLogEntry, Bot, CopyTrader, SystemSetting } from '@/types'
+import { adminPanelService, type PanelAuditRow } from '@/services/admin-panel'
+import type { Bot, CopyTrader, SystemSetting } from '@/types'
+
+export function AdminSystemPage() {
+  return <SystemHealthPanel />
+}
 
 export function AdminDashboardPage() {
   return <RealAdminDashboard />
-}
-
-export function AdminOverviewPage() {
-  return (
-    <div>
-      <PageHeader title="Admin overview" subtitle="Staff console preview. Production users, balances, and payments are not loaded." />
-      <Alert tone="warn">Not connected to any remote database. No production rows are displayed.</Alert>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Users" value="—" hint="Not loaded" />
-        <Stat label="Deposits" value="—" hint="Not loaded" />
-        <Stat label="Withdrawals" value="—" hint="Not loaded" />
-        <Stat label="Trades" value="—" hint="Not loaded" />
-      </div>
-    </div>
-  )
 }
 
 export function AdminUsersPage() {
@@ -80,7 +74,7 @@ export function AdminWithdrawalsPage() {
   const [rows, setRows] = useState<import('@/types').Withdrawal[]>([])
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState<'demo' | 'real'>('real')
+  const [tab, setTab] = useState<'demo' | 'real' | 'payout-desk'>('payout-desk')
 
   useEffect(() => {
     void adminService.listWithdrawals().then((result) => {
@@ -93,23 +87,30 @@ export function AdminWithdrawalsPage() {
   return (
     <AdminTablePage
       title="Withdrawals"
-      subtitle="REAL: M-Pesa payouts to approve and record (hold → pay → enter receipt). DEMO: simulated rows from local storage."
+      subtitle="Payout desk: fee-gated M-Pesa queue. Legacy REAL: hold → pay → receipt. DEMO: local simulated rows."
       loading={loading}
       message={
-        tab === 'real'
-          ? 'REAL withdrawals are live for staff accounts. A request only becomes COMPLETED when you record the M-Pesa receipt of the payment you made (or when M-Pesa B2C confirms it). Fail + refund returns the held amount to the user.'
-          : message
+        tab === 'payout-desk'
+          ? 'Fee-gated payout desk (tax compliance → AI bot → approve → send → mark paid).'
+          : tab === 'real'
+            ? 'Legacy REAL withdrawals: COMPLETED only when you record the M-Pesa receipt (or B2C confirms). Fail + refund returns the hold.'
+            : message
       }
     >
-      <div className="mb-3 flex gap-2">
+      <div className="mb-3 flex flex-wrap gap-2">
+        <Button type="button" variant={tab === 'payout-desk' ? 'primary' : 'secondary'} onClick={() => setTab('payout-desk')} data-testid="admin-withdrawals-payout-desk">
+          Payout desk
+        </Button>
         <Button type="button" variant={tab === 'real' ? 'primary' : 'secondary'} onClick={() => setTab('real')} data-testid="admin-withdrawals-real">
-          REAL
+          Legacy REAL
         </Button>
         <Button type="button" variant={tab === 'demo' ? 'primary' : 'secondary'} onClick={() => setTab('demo')}>
           DEMO
         </Button>
       </div>
-      {tab === 'real' ? (
+      {tab === 'payout-desk' ? (
+        <AdminPayoutDeskPanel />
+      ) : tab === 'real' ? (
         <RealWithdrawalsAdmin />
       ) : rows.length === 0 ? (
         <p className="text-sm text-mist">No LOCAL DEMO withdrawals yet.</p>
@@ -252,6 +253,18 @@ export function AdminCopyTradersPage() {
   )
 }
 
+export function AdminFeesPage() {
+  return (
+    <AdminTablePage
+      title="Fees & payments"
+      subtitle="Edit deposit rates, withdrawal fees, payout-desk tax/bot fees, and REAL trading stake limits. Staff only (admin / finance)."
+      message="Saved values apply to new deposits, withdrawals, and trades."
+    >
+      <AdminFeesPanel />
+    </AdminTablePage>
+  )
+}
+
 export function AdminSettingsPage() {
   const [settings, setSettings] = useState<SystemSetting[]>([])
   const [message, setMessage] = useState('')
@@ -299,30 +312,28 @@ export function AdminSettingsPage() {
 }
 
 export function AdminAuditPage() {
-  const [rows, setRows] = useState<AuditLogEntry[]>([])
+  const [rows, setRows] = useState<PanelAuditRow[]>([])
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    void adminService.listAuditLogs().then((result) => {
-      setRows(result.data)
-      setLoading(false)
-    })
+    const load = () =>
+      void adminPanelService.auditLog().then((result) => {
+        setLoading(false)
+        if (result.ok) {
+          setRows(result.data)
+          setError(null)
+        } else {
+          setError(result.error)
+        }
+      })
+    load()
+    return adminPanelService.subscribe(load)
   }, [])
 
   return (
-    <AdminTablePage
-      title="Audit logs"
-      subtitle="Empty until a backend audit stream is connected. No fabricated staff actions."
-      loading={loading}
-    >
-      {rows.length === 0 ? <p className="text-sm text-mist">No audit rows.</p> : null}
-      <ul className="space-y-2">
-        {rows.map((row) => (
-          <li key={row.id} className="rounded-xl border border-line px-3 py-2 text-sm">
-            {row.actorEmail} · {row.action} · {row.targetType}/{row.targetId}
-          </li>
-        ))}
-      </ul>
+    <AdminTablePage title="Audit logs" subtitle="Admin changes to simulated balances and win rates. Updates live." loading={loading} message={error ?? 'Live admin audit log (superadmin only).'}>
+      <AuditSection rows={rows} />
     </AdminTablePage>
   )
 }

@@ -3,11 +3,11 @@ import { Badge, Button, Card, EmptyState, PageHeader, Stat } from '@/components/
 import { AccountHistoryCharts } from '@/features/wallet/AccountHistoryCharts'
 import { useAccountMode } from '@/hooks/useAccountMode'
 import { useAuthSession } from '@/hooks/useAuth'
+import { usePracticeBook } from '@/hooks/usePracticeBook'
 import { useWallet, useWalletHistory } from '@/hooks/useWallet'
 import { useTrades } from '@/hooks/useTrades'
 import { REAL_BALANCE_PLACEHOLDER, accountModeLabel } from '@/domain/account'
 import { formatMoney } from '@/lib/format'
-
 const links = [
   { to: '/app/trade', label: 'Trade' },
   { to: '/app/wallet', label: 'Wallet' },
@@ -26,12 +26,13 @@ export function UserDashboardPage() {
   const { open, history } = useTrades(kind)
   const { transactions } = useWalletHistory(kind)
   const isDemo = kind === 'demo'
+  const { isPractice } = usePracticeBook()
 
   return (
     <div>
       <PageHeader
-        title={isDemo ? 'DEMO Overview' : 'REAL Overview'}
-        subtitle={isDemo ? 'Practice with virtual funds.' : undefined}
+        title={isPractice ? 'Practice Overview' : isDemo ? 'DEMO Overview' : 'REAL Overview'}
+        subtitle={isPractice ? 'Practice only: separate virtual balance, no real money.' : isDemo ? 'Practice with virtual funds.' : undefined}
         actions={<Badge tone={isDemo ? 'demo' : 'live'}>{accountModeLabel(kind)}</Badge>}
       />
       {!isDemo && !isSignedIn ? (
@@ -51,9 +52,9 @@ export function UserDashboardPage() {
       ) : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat
-          label={isDemo ? 'Demo Balance' : 'Real Balance'}
+          label={isPractice ? 'Practice Balance' : isDemo ? 'Demo Balance' : 'Real Balance'}
           value={isDemo ? formatMoney(wallet?.availableBalance ?? null) : balanceDisplay || REAL_BALANCE_PLACEHOLDER}
-          hint={isDemo ? 'Virtual funds' : undefined}
+          hint={isPractice ? 'Practice only · virtual funds' : isDemo ? 'Virtual funds' : undefined}
           tone={isDemo ? 'demo' : 'live'}
         />
         <Stat label={isDemo ? 'DEMO Open' : 'Open positions'} value={String(open.length)} />

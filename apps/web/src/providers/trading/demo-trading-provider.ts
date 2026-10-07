@@ -17,8 +17,12 @@ import {
   validateContractSelection,
   type DigitContractSelection,
 } from '@/domain/digit-contracts'
+import { demoExitDigit, priceWithLastDigit } from '@/domain/outcome/demo-win-rate'
 import { createId, nowIso } from '@/lib/ids'
+import { recordSimulatedChange } from '@/lib/simulated-balance-sync'
+import { getSimulatedWinRate } from '@/lib/sim-win-rate'
 import { extractLastDigit } from '@/providers/market-data/deriv-digits'
+import { ensureSimulatedFeed } from '@/providers/market-data/simulated-provider'
 import {
   firstTickAtOrAfter,
   getBufferedTicks,
@@ -68,6 +72,13 @@ function tickDigit(tick: Tick): number {
   return lastDigitOfPrice(tick.price)
 }
 
+function demoExit(trade: Trade, tick: Tick): { price: number; digit: number } {
+  const natural = tickDigit(tick)
+  const digit = demoExitDigit(trade, natural, Math.random, getSimulatedWinRate())
+  if (digit === natural) return { price: tick.price, digit }
+  return { price: priceWithLastDigit(tick.price, tick.pipSize, digit), digit }
+}
+
 export interface TradingProvider {
   readonly id: string
   getQuote(input: {
@@ -114,9 +125,7 @@ function demoQuote(stake: number, selection: DigitContractSelection): ContractQu
     potentialReturn: valid ? potentialPayout(stake, selection) : null,
     potentialLoss: valid ? stake : null,
     available: valid,
-    message: valid
-      ? 'DEMO simulated payout if the contract wins. Not a guaranteed profit or win rate.'
-      : 'Enter a stake greater than zero.',
+    message: valid ? 'Simulated quote.' : 'Enter a stake greater than zero.',
     isSimulated: true,
     accountMode: 'demo',
   }
@@ -160,6 +169,14 @@ function lockStake(trade: Trade, now: number): void {
       now,
     )
   })
+  void recordSimulatedChange('stake', trade.stake, trade.id, {
+    symbol: trade.symbol,
+    contractType: trade.contractType,
+    contractOption: trade.contractOption,
+    selectedDigit: trade.selectedDigit,
+    barrier: trade.barrier,
+    botRunId: trade.botRunId ?? null,
+  })
 }
 
 /**
@@ -180,16 +197,16 @@ export function settleDemoTrades(now = Date.now()): Trade[] {
     const expiryMs = new Date(trade.expiresAt!).getTime()
     const exitTick = firstTickAtOrAfter(trade.symbol, expiryMs)
     if (exitTick) {
-      const exitDigit = tickDigit(exitTick)
+      const exit = demoExit(trade, exitTick)
       const outcome = settleDigitContract({
         contractType: trade.contractType,
         contractOption: trade.contractOption,
         selectedDigit: trade.selectedDigit,
         barrier: trade.barrier,
-        exitPrice: exitTick.price,
-        exitDigit,
+        exitPrice: exit.price,
+        exitDigit: exit.digit,
       })
-      settled.push(closeDemoTrade(trade, outcome, exitTick.price, exitDigit, now))
+      settled.push(closeDemoTrade(trade, outcome, exit.price, exit.digit, now))
       backfillRequestedAt.delete(trade.id)
       continue
     }
@@ -233,16 +250,16 @@ function settleDemoTickTrade(trade: Trade, durationTicks: number, anchorMs: numb
     }
     tickWindowVerified.delete(trade.id)
     backfillRequestedAt.delete(trade.id)
-    const exitDigit = tickDigit(found.exit)
+    const exit = demoExit(trade, found.exit)
     const outcome = settleDigitContract({
       contractType: trade.contractType,
       contractOption: trade.contractOption,
       selectedDigit: trade.selectedDigit,
       barrier: trade.barrier,
-      exitPrice: found.exit.price,
-      exitDigit,
+      exitPrice: exit.price,
+      exitDigit: exit.digit,
     })
-    return closeDemoTrade(trade, outcome, found.exit.price, exitDigit, now)
+    return closeDemoTrade(trade, outcome, exit.price, exit.digit, now)
   }
 
   source?.ensureSubscribed(trade.symbol)
@@ -316,8 +333,8 @@ function closeDemoTrade(
       reference: trade.id,
       note:
         outcome === 'cancelled'
-          ? 'DEMO stake refunded — no genuine exit tick was available'
-          : `DEMO settlement (${outcome}) on live exit digit ${exitDigit ?? '—'}`,
+          ? 'DEMO stake refunded — no exit tick was available'
+          : `DEMO settlement (${outcome}) on simulated exit digit ${exitDigit ?? '—'}`,
       isSimulated: true,
       createdAt: updatedAt,
       updatedAt,
@@ -343,11 +360,12 @@ function closeDemoTrade(
       'trading',
       `DEMO trade ${outcome}`,
       outcome === 'cancelled'
-        ? `${trade.market}: no live exit tick could be loaded, DEMO stake refunded.`
-        : `${trade.market} ${outcome.toUpperCase()} on live digit ${exitDigit ?? '—'}. P/L ${profitLoss}. DEMO funds — not real money.`,
+        ? `${trade.market}: no exit tick could be loaded, DEMO stake refunded.`
+        : `${trade.market} ${outcome.toUpperCase()} on simulated digit ${exitDigit ?? '—'}. P/L ${profitLoss}. DEMO funds — not real money.`,
       now,
     )
   })
+  void recordSimulatedChange('settle', payout, trade.id, { outcome, exitDigit, stake: trade.stake })
   return closed
 }
 
@@ -430,14 +448,14 @@ export const demoTradingProvider: TradingProvider = {
         isSimulated: true,
       }
     }
-    getLiveTickSource()?.ensureSubscribed(input.symbol)
+    ensureSimulatedFeed()
     const now = Date.now()
     const entryTick = getLatestBufferedTick(input.symbol)
     if (!entryTick || now - getLastReceivedAt(input.symbol) > ENTRY_MAX_AGE_MS) {
       return {
         status: 'not_connected',
         connected: false,
-        message: `Waiting for a live price on ${input.symbol}. DEMO trades open only against genuine market ticks — try again once the chart shows CONNECTED.`,
+        message: `Waiting for a simulated price on ${input.symbol}. Try again in a moment.`,
         data: null,
         code: 'LIVE_MARKET_DATA_UNAVAILABLE',
         accountMode: 'demo',
@@ -496,8 +514,8 @@ export const demoTradingProvider: TradingProvider = {
     return okDemo(
       trade,
       durationTicks != null
-        ? `Trade placed at ${entryPrice}. Settles on the ${durationTicks}${ordinalSuffix(durationTicks)} live tick after entry.`
-        : `Trade placed at ${entryPrice}. Settles on the real exit tick.`,
+        ? `Trade placed at ${entryPrice}. Settles on the ${durationTicks}${ordinalSuffix(durationTicks)} simulated tick after entry.`
+        : `Trade placed at ${entryPrice}. Settles on the simulated exit tick.`,
     )
   },
 

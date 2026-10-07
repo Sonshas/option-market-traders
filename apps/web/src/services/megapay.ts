@@ -1,4 +1,5 @@
 import { getSupabase } from '@/lib/supabase'
+import { edgeErrorMessage } from '@/services/system-issues'
 
 /** Server-side MegaPay config returned by the megapay-deposit Edge Function (GET). */
 export interface MegapayDepositConfig {
@@ -6,6 +7,7 @@ export interface MegapayDepositConfig {
   kesPerUsd: number
   minKes: number
   maxKes: number
+  quickAmounts?: number[]
   message: string | null
 }
 
@@ -24,16 +26,7 @@ export type Result<T> = { ok: true; data: T } | { ok: false; error: string }
 export const UNAVAILABLE = 'Deposits temporarily unavailable'
 
 export async function errorMessage(error: unknown): Promise<string> {
-  const context = (error as { context?: Response } | null)?.context
-  if (context && typeof context.json === 'function') {
-    try {
-      const body = (await context.clone().json()) as { error?: string; message?: string }
-      if (body.error || body.message) return String(body.error ?? body.message)
-    } catch {
-      // fall through
-    }
-  }
-  return UNAVAILABLE
+  return edgeErrorMessage(error, UNAVAILABLE, { area: 'deposits', operation: 'edge.deposit' })
 }
 
 export function mapState(raw: Record<string, unknown>): MegapayDepositState {
@@ -54,6 +47,9 @@ export const megapayService = {
     if (!client) return { ok: false, error: UNAVAILABLE }
     const { data, error } = await client.functions.invoke<Record<string, unknown>>('megapay-deposit', { method: 'GET' })
     if (error || !data) return { ok: false, error: await errorMessage(error) }
+    const quick = Array.isArray(data.quick_amounts)
+      ? data.quick_amounts.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
+      : undefined
     return {
       ok: true,
       data: {
@@ -61,6 +57,7 @@ export const megapayService = {
         kesPerUsd: Number(data.kes_per_usd),
         minKes: Number(data.min_kes),
         maxKes: Number(data.max_kes),
+        quickAmounts: quick && quick.length ? quick : undefined,
         message: (data.message as string | null) ?? null,
       },
     }

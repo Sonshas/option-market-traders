@@ -28,7 +28,7 @@
 | `20260919163523` | `fix_function_search_path` |
 | `20260920111952` | `align_markets_catalog_with_app` **(new)** |
 
-Local copy: `supabase/migrations/20260920111952_align_markets_catalog_with_app.sql`
+Local copy (fresh installs): `supabase/migrations/20260920111952_smartbasebinary_host_schema.sql` — see section `from: 20260920111952_align_markets_catalog_with_app.sql` in `supabase/migrations/MIGRATION_MANIFEST.md`
 
 ---
 

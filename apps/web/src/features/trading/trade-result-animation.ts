@@ -1,5 +1,11 @@
-import { lastDigitOfPrice } from '@/domain/contracts'
-import { calculateTradeResult, contractKindOf, extractLastDigit, isValidDigit } from '@/domain/digit-contracts'
+import {
+  calculateTradeResult,
+  contractKindOf,
+  extractLastDigit,
+  isValidDigit,
+  lastDigitOfPrice,
+  selectionTarget,
+} from '@/domain/digit-contracts'
 import type { AccountMode, ContractOption, ContractType, Trade } from '@/types'
 
 /**
@@ -29,10 +35,10 @@ export interface TradeResultAnimationState {
   profitLoss: number | null
 }
 
-/** Final digit stays on screen this long before the result is revealed. */
-export const SETTLE_HOLD_MS = 3_000
+/** The result is revealed as soon as the cursor stops on the settled digit. */
+export const SETTLE_HOLD_MS = 0
 /** A revealed result stays at least this long before a queued trade replaces it. */
-export const RESULT_MIN_MS = 1_500
+export const RESULT_MIN_MS = 3_000
 /** With no newer trade, the result clears back to the idle strip after this long. */
 export const RESULT_VISIBLE_MS = 8_000
 /** Settled trades created this close to entering the account mode still count as new (clock skew). */
@@ -76,17 +82,21 @@ export function settledDigitOf(trade: Pick<Trade, 'exitDigit' | 'exitPrice'>, pi
   return lastDigitOfPrice(trade.exitPrice)
 }
 
-/** Dev cross-check of a settled status against the shared contract rule; returns a warning or null. */
+/** Dev cross-check of a settled status against the natural contract rules; returns a warning or null. */
 export function crossCheckSettledStatus(trade: Trade, settledDigit: number | null): string | null {
   if (trade.status !== 'won' && trade.status !== 'lost') return null
   if (!isValidDigit(settledDigit)) return null
-  const target =
-    trade.contractType === 'MATCH_DIFFER' ? trade.selectedDigit : trade.contractType === 'OVER_UNDER' ? trade.barrier : null
-  if (trade.contractType !== 'EVEN_ODD' && !isValidDigit(target)) return null
-  const expected = calculateTradeResult(contractKindOf(trade.contractOption), target, settledDigit)
+  const kind = contractKindOf(trade.contractOption)
+  const target = selectionTarget({
+    contractType: trade.contractType,
+    contractOption: trade.contractOption,
+    selectedDigit: trade.selectedDigit,
+    barrier: trade.barrier,
+  })
+  const expected = calculateTradeResult(kind, target, settledDigit)
   const reported = trade.status === 'won' ? 'WIN' : 'LOSS'
   if (expected === reported) return null
-  return `Trade ${trade.id}: settled status ${trade.status.toUpperCase()} disagrees with digit-contracts (${expected}) for ${trade.contractOption} on digit ${settledDigit}. Showing the settled status.`
+  return `Trade ${trade.id}: UI settlement check disagrees with stored status (${trade.status}) on digit ${settledDigit}. Showing the stored status.`
 }
 
 export interface TradeResultAnimatorOptions {
@@ -175,8 +185,9 @@ export function createTradeResultAnimator(options: TradeResultAnimatorOptions = 
       const mismatch = crossCheckSettledStatus(trade, settledDigit)
       if (mismatch) warn(mismatch)
     }
-    const won = trade.status === 'won'
-    set({ status: won ? 'won' : 'lost', result: won ? 'WIN' : 'LOSS' })
+    // Display follows the settled trade status — never invent a win/loss in the animation.
+    const result: 'WIN' | 'LOSS' = trade.status === 'won' ? 'WIN' : 'LOSS'
+    set({ status: trade.status === 'won' ? 'won' : 'lost', result })
     afterResult()
   }
 
@@ -211,6 +222,18 @@ export function createTradeResultAnimator(options: TradeResultAnimatorOptions = 
     start(trade)
   }
 
+  function resetTracking() {
+    enteredAt = now()
+    seen = new Set()
+    known = new Map()
+    current = null
+    pendingId = null
+    resultShownAt = null
+    clearTimer()
+    state = IDLE_ANIMATION
+    for (const listener of listeners) listener()
+  }
+
   function createdMs(trade: Trade): number {
     const ms = new Date(trade.createdAt).getTime()
     return Number.isFinite(ms) ? ms : 0
@@ -230,16 +253,11 @@ export function createTradeResultAnimator(options: TradeResultAnimatorOptions = 
     setAccountMode(next: AccountMode) {
       if (next === kind) return
       kind = next
-      enteredAt = now()
-      seen = new Set()
-      known = new Map()
-      current = null
-      pendingId = null
-      resultShownAt = null
-      clearTimer()
-      state = IDLE_ANIMATION
-      for (const listener of listeners) listener()
+      resetTracking()
     },
+
+    /** Switching between the Demo and Practice books (same account mode) also starts over. */
+    reset: resetTracking,
 
     /** Latest open + settled trades of the current account mode. */
     syncTrades(trades: readonly Trade[], ctx: SyncContext = {}) {

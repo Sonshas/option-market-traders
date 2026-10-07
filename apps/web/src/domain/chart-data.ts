@@ -1,3 +1,4 @@
+import { settledResult } from '@/domain/trade-result'
 import type { Candle, Tick, Trade, WalletLedger } from '@/types'
 
 /** Time-value point in milliseconds since epoch. */
@@ -104,8 +105,9 @@ export function summarizeTrades(trades: Trade[]): TradeSummary {
   let netPnl = 0
   let totalStaked = 0
   for (const trade of settled) {
-    if (trade.status === 'won') wins += 1
-    else if (trade.status === 'lost') losses += 1
+    const result = settledResult(trade)
+    if (result === 'WIN') wins += 1
+    else if (result === 'LOSS') losses += 1
     else ties += 1
     netPnl += trade.profitLoss as number
     totalStaked += trade.stake

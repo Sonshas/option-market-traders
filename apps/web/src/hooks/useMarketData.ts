@@ -5,6 +5,8 @@ import { isMarketDataProviderConfigured } from '@/providers/market-data/env'
 import { getBufferedTicks, getLastReceivedAt, subscribeTickBuffer } from '@/providers/market-data/tick-buffer'
 import type { Candle, ConnectionStatus, Market, MarketSnapshot, Tick, Timeframe } from '@/types'
 
+const CHART_UNAVAILABLE = 'Chart history is temporarily unavailable. Retryingâ€¦'
+const TICKS_UNAVAILABLE = 'Live ticks are temporarily unavailable. Retryingâ€¦'
 const LIST_REFRESH_MS = 2_000
 const QUOTE_REFRESH_MS = 20_000
 /** Failed Deriv candle history is retried with backoff (2s, 4s, 8s, then every 15s). */
@@ -21,7 +23,7 @@ export function useMarkets() {
   useEffect(() => {
     let cancelled = false
     const provider = getMarketDataProvider(kind)
-    // Drop previous mode catalog immediately to prevent DEMO↔REAL leakage.
+    // Drop previous mode catalog immediately to prevent DEMOâ†”REAL leakage.
     setMarkets([])
     setLoading(true)
     setConnectionStatus(provider.getStatus())
@@ -100,7 +102,7 @@ function applyLiveCandle(
   } else if (update.candle.time === last.time) {
     candles[candles.length - 1] = update.candle
   } else {
-    // Stale candle — ignore OHLC but still refresh tick if newer.
+    // Stale candle â€” ignore OHLC but still refresh tick if newer.
     return {
       ...prev,
       lastTick: update.tick ?? prev.lastTick,
@@ -191,7 +193,7 @@ export function useMarketSnapshot(symbol: string, timeframe: Timeframe, enabled 
           if (cancelled) return
           const status = provider.getStatus()
           if (next.candles.length === 0 && next.status === 'error') {
-            setError(next.note ?? 'Deriv candle history unavailable.')
+            setError(next.note ?? CHART_UNAVAILABLE)
             setLoading(false)
             retryLater(attempt)
             return
@@ -204,14 +206,14 @@ export function useMarketSnapshot(symbol: string, timeframe: Timeframe, enabled 
             status,
           }))
           if (next.candles.length === 0 && next.status === 'disconnected') {
-            setError(next.note ?? 'Deriv candle history unavailable.')
+            setError(next.note ?? CHART_UNAVAILABLE)
           }
           setConnectionStatus(status)
           setLoading(false)
         })
-        .catch((err: unknown) => {
+        .catch(() => {
           if (cancelled) return
-          setError(err instanceof Error ? err.message : 'Deriv candle history unavailable.')
+          setError(CHART_UNAVAILABLE)
           setLoading(false)
           retryLater(attempt)
         })
@@ -370,12 +372,12 @@ export function useTickStream(symbol: string, historyCount = 1000) {
           if (cancelled) return
           setTicks(getBufferedTicks(symbol))
           setLoading(false)
-          if (history.length === 0) setError('No tick history returned by the market-data provider.')
+          if (history.length === 0) setError(TICKS_UNAVAILABLE)
         })
-        .catch((err: unknown) => {
+        .catch(() => {
           if (cancelled) return
           setLoading(false)
-          setError(err instanceof Error ? err.message : 'Tick history unavailable')
+          setError(TICKS_UNAVAILABLE)
         })
     } else {
       setLoading(false)

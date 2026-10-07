@@ -4,6 +4,7 @@ import {
   DEMO_WALLET_ID,
 } from '@/domain/account'
 import { createId, nowIso } from '@/lib/ids'
+import { recordSimulatedChange } from '@/lib/simulated-balance-sync'
 import {
   appendDemoLedger,
   applyDemoBalance,
@@ -22,6 +23,9 @@ import type {
   Wallet,
   Withdrawal,
 } from '@/types'
+
+/** Same per-top-up cap as public.apply_simulated_change. */
+export const MAX_SIMULATED_TOPUP = 1_000_000
 
 export interface WalletProvider {
   readonly id: string
@@ -109,11 +113,11 @@ export const demoWalletProvider: WalletProvider = {
     if (input.kind !== 'demo') {
       return demoOnly(input.kind, null, () => okDemo(null, ''))
     }
-    if (!(input.amount > 0)) {
+    if (!(input.amount > 0) || input.amount > MAX_SIMULATED_TOPUP) {
       return {
         status: 'not_connected',
         connected: false,
-        message: 'Enter a demo deposit amount greater than zero.',
+        message: `Enter a demo deposit amount greater than zero and at most ${MAX_SIMULATED_TOPUP.toLocaleString('en-US')}.`,
         data: null,
         code: 'VALIDATION',
         accountMode: 'demo',
@@ -173,6 +177,7 @@ export const demoWalletProvider: WalletProvider = {
         now,
       )
     })
+    void recordSimulatedChange('topup', input.amount, deposit.id)
     return okDemo(deposit, 'DEMO simulated deposit completed. This is virtual practice funds, not real money.')
   },
 
@@ -256,6 +261,7 @@ export const demoWalletProvider: WalletProvider = {
         now,
       )
     })
+    void recordSimulatedChange('withdraw', input.amount, withdrawal.id)
     return okDemo(withdrawal, 'DEMO simulated withdrawal completed. No real funds were transferred.')
   },
 }

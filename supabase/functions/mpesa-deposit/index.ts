@@ -7,14 +7,13 @@ import {
   corsHeaders,
   json,
   publicDeposit,
-  realPaymentsEnabled,
   userFromRequest,
 } from '../_shared/server.ts'
 import {
   DARAJA_DEPOSIT_COLUMNS,
   DarajaAuthError,
-  darajaConfig,
   darajaConfigured,
+  resolveDarajaConfig,
   stkPush,
   type DarajaDepositRow,
 } from '../_shared/daraja-server.ts'
@@ -28,12 +27,12 @@ const RATE_LIMIT_MAX_PENDING = 3
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const cfg = darajaConfig()
   const admin = adminClient()
   const user = await userFromRequest(admin, req)
   if (!user) return json({ error: 'Sign in to deposit.' }, 401)
 
-  const enabled = await realPaymentsEnabled(admin)
+  const cfg = await resolveDarajaConfig(admin)
+  const enabled = false
   const configured = darajaConfigured(cfg)
 
   if (req.method === 'GET') {
@@ -47,10 +46,12 @@ Deno.serve(async (req) => {
       kes_per_usd: cfg.kesPerUsd,
       min_kes: cfg.minKes,
       max_kes: cfg.maxKes,
+      quick_amounts: cfg.quickAmounts,
       message: enabled && configured ? null : UNAVAILABLE_MESSAGE,
     })
   }
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  if (!enabled) return json({ error: 'Deposits are closed. This site is DEMO practice only.' }, 403)
 
   if (cfg.provider !== DARAJA_PROVIDER) return json({ error: 'Deposit method changed. Please reopen the deposit form.' }, 409)
   if (!configured) return json({ error: UNAVAILABLE_MESSAGE }, 503)

@@ -1,5 +1,7 @@
 # REAL withdrawals (M-Pesa payouts)
 
+> **Fee-gated payout desk:** the wallet withdraw UI now embeds `apps/web/src/features/payout-desk` (from `real-mpesa-withdraw`). That desk uses a **separate** Supabase project and the tax → AI bot fee order. Setup: `supabase/payout-desk/README.md`. The legacy hold→pay→receipt flow below remains available under **Admin → Withdrawals → Legacy REAL**.
+
 REAL withdrawals send money from the business M-Pesa to the user's Safaricom number. A withdrawal is **COMPLETED
 only when the money has actually been sent** — either Safaricom's B2C result callback confirmed it, or a staff
 member recorded the M-Pesa receipt of a payment they made by hand. Nothing in the web app can mark a withdrawal
@@ -10,7 +12,7 @@ completed, and nothing is completed on submission.
 | Rule | Where |
 | --- | --- |
 | Amount ≤ the user's available REAL balance | DB function (wallet row lock) + Edge Function pre-check |
-| Minimum KES 1,000, maximum **KES 400,000 per request** (≈ $3,076.92 at 130 KES/USD). The 400,000 cap is hard-coded in the DB and the shared module; `WITHDRAWAL_MAX_KES` can only lower it | DB function, `domain/withdrawals.ts` |
+| Minimum KES 1,000, maximum **KES 400,000 per request** (≈ $3,076.92 at 130 KES/USD). The 400,000 cap is hard-coded in the DB and the shared module; `WITHDRAWAL_MAX_KES` / Admin → Fees can only lower it | DB function, `domain/payments/withdrawals.ts` |
 | At least one settled REAL trade (`won` or `lost`; ties/cancellations do not count) before the first payout. Without it the panel shows only "Complete at least one REAL trade before withdrawing." | DB function (`no_real_trade`) + Edge Function GET/POST |
 | DEMO funds can never be withdrawn: the DB function only touches the `account_mode='real'`, `is_simulated=false` wallet; DEMO stays simulated in local storage | DB function |
 | One open (PENDING/PROCESSING) withdrawal per user | partial unique index + explicit check |
@@ -97,10 +99,10 @@ maintenance"). Open requests can still be completed or refunded.
 
 ## Tests
 
-- `apps/web/src/domain/withdrawals.test.ts` — amount/phone validation, KES conversion, fee/net quote, the
+- `apps/web/src/domain/payments/withdrawals.test.ts` — amount/phone validation, KES conversion, fee/net quote, the
   400,000 cap, the eligibility copy, status copy (never claims success before COMPLETED), B2C payload/result
   parsing, byte-identical web/edge mirror.
-- Database: run `supabase/migrations/20261004130000_real_withdrawals.sql` plus the DO-block test inside
+- Database: run the withdrawals section of `supabase/migrations/20260920111952_smartbasebinary_host_schema.sql` (`from: 20261004130000_real_withdrawals.sql`) plus the DO-block test inside
   `begin; … rollback;` — insufficient balance, limits/phone/reference, hold debits exactly once, second open request
   rejected, processing idempotent, complete requires receipt and does not move balance, double complete/fail
   rejected, fail refunds exactly once, receipt reuse rejected, fee deducted upfront, no settled REAL trade rejected,

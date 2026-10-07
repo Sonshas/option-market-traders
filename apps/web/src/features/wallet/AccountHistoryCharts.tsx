@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { SeriesChart } from '@/components/chart/SeriesChart'
 import { Card, EmptyState, Skeleton, Stat, Tabs } from '@/components/ui'
 import { useTrades } from '@/hooks/useTrades'
+import { usePracticeBook } from '@/hooks/usePracticeBook'
 import { useDemoLedger } from '@/hooks/useWallet'
 import {
   balanceSeriesFromLedger,
@@ -17,7 +18,9 @@ import type { AccountMode } from '@/types'
  * DEMO → local trades + ledger; REAL → Supabase trade rows (read-only, RLS).
  */
 export function AccountHistoryCharts({ kind, compact = false }: { kind: AccountMode; compact?: boolean }) {
+  const { isPractice } = usePracticeBook()
   const isDemo = kind === 'demo'
+  const bookLabel = isPractice ? 'Practice' : 'DEMO'
   const { history, loading } = useTrades(kind)
   const ledger = useDemoLedger()
   const [view, setView] = useState(isDemo ? 'balance' : 'pnl')
@@ -34,8 +37,8 @@ export function AccountHistoryCharts({ kind, compact = false }: { kind: AccountM
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="font-display font-semibold">{isDemo ? 'DEMO performance' : 'Performance'}</h2>
-          {isDemo ? <p className="text-xs text-mist">From your DEMO trades. Virtual funds only.</p> : null}
+          <h2 className="font-display font-semibold">{isDemo ? `${bookLabel} performance` : 'Performance'}</h2>
+          {isDemo ? <p className="text-xs text-mist">From your {bookLabel} trades. Virtual funds only.</p> : null}
         </div>
         {isDemo ? (
           <Tabs
@@ -61,7 +64,7 @@ export function AccountHistoryCharts({ kind, compact = false }: { kind: AccountM
             label="Net P/L"
             value={formatMoney(summary.total ? summary.netPnl : null)}
             tone={isDemo ? 'demo' : 'live'}
-            hint={isDemo ? 'DEMO virtual funds' : undefined}
+            hint={isDemo ? `${bookLabel} virtual funds` : undefined}
           />
           <Stat label="Total staked" value={formatMoney(summary.total ? summary.totalStaked : null)} />
         </div>
@@ -73,7 +76,7 @@ export function AccountHistoryCharts({ kind, compact = false }: { kind: AccountM
         ) : points.length < 2 ? (
           <EmptyState
             title={activeView === 'balance' ? 'No balance history yet' : 'No settled trades yet'}
-            body={isDemo ? 'Place a DEMO trade or a DEMO deposit — the chart builds from your own records.' : undefined}
+            body={isDemo ? `Place a ${bookLabel} trade or a ${bookLabel} top up — the chart builds from your own records.` : undefined}
           />
         ) : (
           <SeriesChart

@@ -650,7 +650,6 @@ async function verifyPredictionAutoTrade(page, issues, tag) {
     // Start DEMO Auto Trade and let it place a few trades.
     await page.waitForFunction(() => !document.querySelector('[data-testid="auto-trade-start"]')?.disabled, null, { timeout: 30000 })
     await page.getByTestId('auto-trade-start').click()
-    await page.getByRole('button', { name: /Start DEMO Auto Trade/i }).click()
     await page.getByTestId('auto-trade-stop').waitFor({ timeout: 10000 })
     if (!(await page.getByTestId('ai-bot-scanner-open').isDisabled())) issues.push(`${label}: scanner not disabled while Auto Trade runs`)
     await page
@@ -744,18 +743,19 @@ async function verifyWithdrawals(page, viewportName, issues) {
   const label = `${viewportName} withdrawals`
   const shot = (name) => `${SCREENSHOT_DIR}${name}`
   try {
-    // DEMO: the simulated withdrawal flow is unchanged and never shows the REAL panel.
+    // DEMO funds cannot be withdrawn: Withdraw switches to the REAL account and never simulates a payout.
     await page.evaluate(() => localStorage.setItem('sbb.accountMode', 'demo'))
     await page.goto(`${BASE}/app/wallet`, { waitUntil: 'domcontentloaded', timeout: 20000 })
     await page.waitForTimeout(400)
-    const demoWithdraw = page.getByRole('button', { name: /^DEMO Withdrawal$/i })
-    if (!(await demoWithdraw.count())) issues.push(`${label}: DEMO Withdrawal button missing`)
+    const demoWithdraw = page.getByTestId('wallet-withdraw')
+    if (!(await demoWithdraw.count())) issues.push(`${label}: Withdraw button missing in DEMO`)
     else {
       await demoWithdraw.click()
-      await page.waitForTimeout(200)
-      if (!(await page.getByRole('button', { name: /Confirm DEMO withdrawal/i }).count())) issues.push(`${label}: DEMO withdrawal dialog did not open`)
-      if (await page.getByTestId('real-withdraw-panel').count()) issues.push(`${label}: REAL panel rendered in DEMO mode`)
+      await page.waitForTimeout(300)
+      if (await page.getByRole('button', { name: /Confirm DEMO withdrawal/i }).count()) issues.push(`${label}: DEMO withdrawal simulation still opens`)
+      if ((await page.evaluate(() => localStorage.getItem('sbb.accountMode'))) !== 'real') issues.push(`${label}: DEMO Withdraw did not switch to REAL`)
       await page.keyboard.press('Escape')
+      await page.evaluate(() => localStorage.setItem('sbb.accountMode', 'demo'))
     }
     await page.goto(`${BASE}/app/trade`, { waitUntil: 'domcontentloaded', timeout: 20000 })
     await page.waitForTimeout(400)

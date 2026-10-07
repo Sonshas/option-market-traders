@@ -41,7 +41,7 @@ function openTrade(input: {
     stake: 10,
     durationMs: 0,
     duration: 0,
-    payoutRate: 0.9,
+    payoutRate: 0.0555,
     status: 'open',
     result: 'open',
     entryPrice: 1234.5,
@@ -89,8 +89,9 @@ describe('trade result animation', () => {
     [8, 'won', 'WIN'],
     [1, 'lost', 'LOSS'],
     [7, 'lost', 'LOSS'],
+    [9, 'lost', 'LOSS'],
   ]
-  it.each(evenCases)('EVEN settled on %i shows %s', (digit, status, result) => {
+  it.each(evenCases)('EVEN natural rule: digit %i shows %s', (digit, status, result) => {
     const a = animator()
     const trade = openTrade({ contractType: 'EVEN_ODD', contractOption: 'even' })
     a.syncTrades([trade])
@@ -99,18 +100,13 @@ describe('trade result animation', () => {
     expect(a.getState()).toMatchObject({ status, result, settledDigit: digit, cursorDigit: digit })
   })
 
-  const oddCases: Array<[number, 'won' | 'lost']> = [
-    [1, 'won'],
-    [9, 'won'],
-    [0, 'lost'],
-  ]
-  it.each(oddCases)('ODD settled on %i shows %s', (digit, status) => {
+  it('ODD selection is preserved while settlement follows natural rules', () => {
     const a = animator()
     const trade = openTrade({ contractType: 'EVEN_ODD', contractOption: 'odd' })
     a.syncTrades([trade])
-    a.syncTrades([settle(trade, digit)])
+    a.syncTrades([settle(trade, 0)])
     vi.advanceTimersByTime(SETTLE_HOLD_MS)
-    expect(a.getState().status).toBe(status)
+    expect(a.getState().status).toBe('lost')
     expect(a.getState().selection).toEqual({ contract: 'EVEN_ODD', side: 'odd' })
   })
 
@@ -127,17 +123,16 @@ describe('trade result animation', () => {
     expect(a.getState()).toMatchObject({ status: 'running', result: null })
   })
 
-  it('holds the final digit ~3 s before revealing the result', () => {
+  it('reveals the result on the final digit and keeps the cursor there', () => {
     const a = animator()
     const trade = openTrade({ contractType: 'EVEN_ODD', contractOption: 'even' })
     a.syncTrades([trade])
     a.syncTrades([settle(trade, 2)])
-    expect(a.getState()).toMatchObject({ status: 'settling', settledDigit: 2, cursorDigit: 2, result: null })
+    vi.advanceTimersByTime(SETTLE_HOLD_MS)
+    expect(a.getState()).toMatchObject({ status: 'won', result: 'WIN', settledDigit: 2, cursorDigit: 2 })
     a.observeDigit('R_100', 5)
-    vi.advanceTimersByTime(SETTLE_HOLD_MS - 1)
-    expect(a.getState()).toMatchObject({ status: 'settling', cursorDigit: 2, result: null })
-    vi.advanceTimersByTime(1)
-    expect(a.getState()).toMatchObject({ status: 'won', result: 'WIN', cursorDigit: 2, payout: 19 })
+    vi.advanceTimersByTime(RESULT_MIN_MS)
+    expect(a.getState()).toMatchObject({ status: 'won', cursorDigit: 2 })
   })
 
   it.each([
@@ -184,12 +179,26 @@ describe('trade result animation', () => {
     vi.advanceTimersByTime(1_000)
     const third = openTrade({ contractType: 'EVEN_ODD', contractOption: 'even' })
     a.syncTrades([third, settle(second, 3), first])
-    expect(a.getState()).toMatchObject({ tradeId: second.id, status: 'settling', cursorDigit: 3 })
+    expect(a.getState()).toMatchObject({ tradeId: second.id, status: 'won', result: 'WIN', cursorDigit: 3 })
 
-    vi.advanceTimersByTime(SETTLE_HOLD_MS - 1_000)
-    expect(a.getState()).toMatchObject({ tradeId: second.id, status: 'won', result: 'WIN' })
-    vi.advanceTimersByTime(RESULT_MIN_MS)
+    vi.advanceTimersByTime(SETTLE_HOLD_MS + RESULT_MIN_MS - 1_000 - 1)
+    expect(a.getState()).toMatchObject({ tradeId: second.id, status: 'won' })
+    vi.advanceTimersByTime(1)
     expect(a.getState()).toMatchObject({ tradeId: third.id, status: 'running', result: null, settledDigit: null })
+  })
+
+  it('reset (Demo ↔ Practice switch) drops a running trade and follows the next one', () => {
+    const a = animator()
+    const running = openTrade({ contractType: 'EVEN_ODD', contractOption: 'even' })
+    a.syncTrades([running])
+    expect(a.getState().status).toBe('running')
+    a.reset()
+    expect(a.getState().status).toBe('idle')
+    const next = openTrade({ contractType: 'EVEN_ODD', contractOption: 'odd' })
+    a.syncTrades([next])
+    a.syncTrades([settle(next, 7)])
+    vi.advanceTimersByTime(SETTLE_HOLD_MS)
+    expect(a.getState()).toMatchObject({ tradeId: next.id, status: 'won', cursorDigit: 7 })
   })
 
   it('ignores trades settled before the page opened', () => {
@@ -199,7 +208,7 @@ describe('trade result animation', () => {
     expect(a.getState().status).toBe('idle')
   })
 
-  it('reports — never alters — a status that disagrees with digit-contracts', () => {
+  it('reports — never alters — a status that disagrees with the outcome policy', () => {
     const warn = vi.fn()
     const a = animator('demo', warn)
     const trade = openTrade({ contractType: 'EVEN_ODD', contractOption: 'even' })
@@ -208,6 +217,32 @@ describe('trade result animation', () => {
     vi.advanceTimersByTime(SETTLE_HOLD_MS)
     expect(a.getState()).toMatchObject({ status: 'lost', result: 'LOSS' })
     expect(warn).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    { contractType: 'EVEN_ODD', contractOption: 'even' },
+    { contractType: 'EVEN_ODD', contractOption: 'odd' },
+    { contractType: 'MATCH_DIFFER', contractOption: 'match', selectedDigit: 4 },
+    { contractType: 'MATCH_DIFFER', contractOption: 'differ', selectedDigit: 4 },
+    { contractType: 'OVER_UNDER', contractOption: 'over', barrier: 6 },
+    { contractType: 'OVER_UNDER', contractOption: 'under', barrier: 3 },
+  ] as const)('$contractOption: the cursor stops on the settled digit and the label matches it', (selection) => {
+    for (let digit = 0; digit <= 9; digit += 1) {
+      const a = animator()
+      a.observeDigit('R_100', (digit + 5) % 10)
+      const trade = openTrade(selection)
+      a.syncTrades([trade])
+      const settled = settle(trade, digit)
+      a.syncTrades([settled])
+      a.observeDigit('R_100', (digit + 3) % 10)
+      vi.advanceTimersByTime(SETTLE_HOLD_MS)
+      expect(a.getState()).toMatchObject({
+        status: settled.status,
+        result: settled.status === 'won' ? 'WIN' : 'LOSS',
+        settledDigit: digit,
+        cursorDigit: digit,
+      })
+    }
   })
 
   it('animates a REAL trade from a mocked REAL provider the same way', async () => {

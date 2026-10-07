@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import {
   AUTO_HIDDEN_DEFAULTS,
@@ -11,8 +11,11 @@ import {
 } from '@/domain/auto-trade'
 import { LOAD_PREDICTION_FIRST, predictionLabel, type LoadedPrediction } from '@/domain/prediction'
 import { useAuthSession } from '@/hooks/useAuth'
+import { usePracticeBook } from '@/hooks/usePracticeBook'
 import { useAutoTrade } from '@/hooks/useAutoTrade'
 import { useLiveQuote } from '@/hooks/useLiveQuote'
+import { useRealTradingConfig } from '@/hooks/useRealTradingConfig'
+import { REAL_STAKE_MAX, REAL_STAKE_MIN } from '@/domain/digit-contracts'
 import { cn } from '@/lib/cn'
 import { formatMoney, formatPrice } from '@/lib/format'
 import { PREDICTION_CHANGED_STOP, autoTradeEngine, dismissAutoTrade, stopAutoTrade } from '@/providers/bots/auto-trader'
@@ -43,6 +46,7 @@ function accountOf(kind: AccountMode): AutoAccount {
 export function AutoTradePanel({
   kind,
   prediction,
+  symbol,
   ticketReady,
   baseStake,
   durationTicks,
@@ -50,8 +54,10 @@ export function AutoTradePanel({
   waitingForPrice,
 }: {
   kind: AccountMode
-  /** The loaded prediction — the only thing Auto Trade executes. */
+  /** The loaded prediction; with none, DEMO Auto Trade picks EVEN / ODD on `symbol` itself. */
   prediction: LoadedPrediction | null
+  /** The ticket's market. */
+  symbol: string
   /** The ticket shows exactly the loaded prediction (market switched, contract and side applied). */
   ticketReady: boolean
   /** NaN when the ticket stake is invalid. */
@@ -65,6 +71,11 @@ export function AutoTradePanel({
   const isReal = account === 'REAL'
   const auto = useAutoTrade()
   const { isSignedIn } = useAuthSession()
+  const realTrading = useRealTradingConfig(kind)
+  const realStakeBounds = {
+    min: realTrading.config?.stakeMin ?? REAL_STAKE_MIN,
+    max: realTrading.config?.stakeMax ?? REAL_STAKE_MAX,
+  }
   const [targetProfit, setTargetProfit] = useState(String(AUTO_TRADE_DEFAULTS.targetProfit))
   const [stopLoss, setStopLoss] = useState(String(AUTO_TRADE_DEFAULTS.stopLoss))
   const [multiplier, setMultiplier] = useState(String(AUTO_TRADE_DEFAULTS.multiplier))
@@ -78,8 +89,21 @@ export function AutoTradePanel({
 
   useEffect(() => {
     if (prediction) setError(null)
-    if (running && prediction?.id !== session.prediction.id) stopAutoTrade(PREDICTION_CHANGED_STOP)
-  }, [prediction, running, session?.prediction.id])
+    if (running && !session.selfPick && prediction?.id !== session.prediction.id) stopAutoTrade(PREDICTION_CHANGED_STOP)
+  }, [prediction, running, session?.selfPick, session?.prediction.id])
+
+  const { book } = usePracticeBook()
+  const startedBook = useRef(book)
+  useEffect(() => {
+    if (running && startedBook.current !== book) stopAutoTrade('Switched account')
+  }, [book, running])
+  const shownBook = useRef(book)
+  useEffect(() => {
+    if (shownBook.current === book) return
+    shownBook.current = book
+    dismissAutoTrade()
+    setError(null)
+  }, [book])
 
   // Nothing carries over between modes; REAL never runs unattended.
   useEffect(() => {
@@ -109,6 +133,7 @@ export function AutoTradePanel({
   }, [running, session?.account, isSignedIn])
 
   function settings(): AutoTradeSettings {
+    const platformMax = isReal ? realStakeBounds.max : AUTO_TRADE_DEFAULTS.maxStake
     return {
       account,
       ...AUTO_HIDDEN_DEFAULTS,
@@ -118,27 +143,38 @@ export function AutoTradePanel({
       stopLoss: Number(stopLoss),
       multiplier: Number(multiplier),
       maxLossStreak: AUTO_TRADE_DEFAULTS.maxLossStreak,
-      maxStake: AUTO_TRADE_DEFAULTS.maxStake,
+      maxStake: Math.min(AUTO_TRADE_DEFAULTS.maxStake, platformMax),
     }
   }
 
   function start(realConfirmed: boolean) {
-    const result = autoTradeEngine.start(settings(), account, { realConfirmed, prediction })
+    startedBook.current = book
+    const result = autoTradeEngine.start(settings(), account, {
+      realConfirmed,
+      prediction,
+      selfPickSymbol: isReal ? null : symbol,
+      realStakeBounds: isReal ? realStakeBounds : undefined,
+    })
     setConfirmOpen(false)
     setError(result.ok ? null : result.error)
   }
 
+  const selfPick = !isReal && !prediction
+
   function requestStart() {
-    if (!prediction) {
+    if (!prediction && !selfPick) {
       setError(LOAD_PREDICTION_FIRST)
       return
     }
     setError(null)
-    setConfirmOpen(true)
+    if (isReal) setConfirmOpen(true)
+    else start(false)
   }
 
-  const noPrediction = prediction == null
-  const startDisabled = !noPrediction && (!ticketReady || blockReason != null || waitingForPrice)
+  const noPrediction = prediction == null && !selfPick
+  const startDisabled = selfPick
+    ? !symbol || !Number.isFinite(baseStake) || waitingForPrice
+    : !noPrediction && (!ticketReady || blockReason != null || waitingForPrice)
   const blockText =
     blockReason && /unavailable|Sign in/i.test(blockReason) ? REAL_CONNECTION_INACTIVE : (blockReason ?? '')
   const showSettings = !isReal || blockReason == null || running
@@ -146,7 +182,11 @@ export function AutoTradePanel({
   const pnlText = `${pnl >= 0 ? '+' : '−'}$${Math.abs(pnl).toFixed(2)}`
   const stakeText = Number.isFinite(baseStake) && baseStake > 0 ? formatMoney(baseStake) : '—'
   const shownPrediction = running ? session.prediction : prediction
-  const pickText = prediction ? `${predictionLabel(prediction)} on Volatility ${prediction.volatilityLabel}` : 'the loaded prediction'
+  const pickText = prediction
+    ? `${predictionLabel(prediction)} on Volatility ${prediction.volatilityLabel}`
+    : selfPick
+      ? `a random contract (EVEN/ODD, MATCH/DIFFER, OVER/UNDER) on ${symbol}`
+      : 'the loaded prediction'
   const summaryText = `Trades ${pickText} from ${stakeText}, stake ×${Number(multiplier) || 1} after a loss. Stops at +$${Number(targetProfit).toFixed(2)} profit or −$${Number(stopLoss).toFixed(2)} loss.`
 
   const value =
@@ -158,7 +198,7 @@ export function AutoTradePanel({
           ? 'Loading…'
           : '—'
   const rows: Array<[string, string]> = [
-    ['PREDICTION', session ? predictionLabel(session.prediction) : '—'],
+    ['PREDICTION', session ? (session.selfPick ? (current?.prediction ?? 'AUTO PICK') : predictionLabel(session.prediction)) : '—'],
     ['VOLATILITY', session ? `${session.prediction.volatilityLabel} · ${current?.symbol ?? session.prediction.symbol}` : '—'],
     ['VALUE', value],
     ['CONTRACT', current?.contract ?? '—'],
@@ -263,7 +303,11 @@ export function AutoTradePanel({
         <div className="rounded-xl border border-line p-2.5" data-testid="risk-settings">
           <p className="flex items-baseline gap-1.5 text-[11px]" data-testid="auto-direction">
             <span className="text-mist">Direction</span>
-            {shownPrediction ? (
+            {(running && session.selfPick) || (!running && selfPick) ? (
+              <span className="font-mono font-semibold text-signal" data-testid="auto-self-pick">
+                Auto pick · EVEN/ODD, MATCH/DIFFER, OVER/UNDER
+              </span>
+            ) : shownPrediction ? (
               <span
                 className="font-mono font-semibold text-signal"
                 data-option={shownPrediction.side}
@@ -309,17 +353,7 @@ export function AutoTradePanel({
           onClose={() => setConfirmOpen(false)}
           onConfirm={() => start(true)}
         />
-      ) : (
-        <ConfirmDialog
-          open={confirmOpen}
-          title="Start DEMO Auto Trade?"
-          body={`DEMO, virtual funds. ${summaryText} Results are random; no profit is promised.`}
-          confirmLabel="Start DEMO Auto Trade"
-          resultMessage={error}
-          onClose={() => setConfirmOpen(false)}
-          onConfirm={() => start(false)}
-        />
-      )}
+      ) : null}
     </div>
   )
 }

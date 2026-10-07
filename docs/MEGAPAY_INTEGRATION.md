@@ -136,9 +136,10 @@ curl.exe -s -X POST https://optionmarkettraders.com/api/megapay/webhook -H "Cont
 Expect `{"status":"received"}` and an event with `routed_to=omt`, `process_result=no_matching_deposit`, and no
 forward. Always send test bodies from a file: inline PowerShell quoting splits JSON at spaces.
 
-Unit tests (`apps/web/src/domain/megapay.test.ts`) cover phone normalization, KES→USD rounding (matching
+Unit tests (`apps/web/src/domain/payments/megapay.test.ts`) cover phone normalization, KES→USD rounding (matching
 Postgres), config parsing, the reference format, webhook routing, status classification, and that
-`supabase/functions/_shared/megapay.ts` is byte-identical to `apps/web/src/domain/megapay.ts`.
+`supabase/functions/_shared/payments/megapay.ts` is byte-identical to `apps/web/src/domain/payments/megapay.ts`.
+Legacy `domain/megapay.ts` / `_shared/megapay.ts` paths are thin re-export shims.
 
 ## Reconcile
 
@@ -196,10 +197,11 @@ MegaPay dashboard.
 
 ## Files
 
-- `supabase/migrations/20261003000000_megapay_deposits.sql`
+- `supabase/migrations/20260920111952_smartbasebinary_host_schema.sql` (section `from: 20261003000000_megapay_deposits.sql`)
 - `supabase/functions/megapay-deposit/index.ts`, `megapay-status/index.ts`, `megapay-webhook/index.ts`
-- `supabase/functions/_shared/server.ts` (env, MegaPay client, reconciliation) and `_shared/megapay.ts` (pure
-  logic, a copy of `apps/web/src/domain/megapay.ts`)
+- `supabase/functions/_shared/server.ts` (env, MegaPay client, reconciliation) and
+  `_shared/payments/megapay.ts` (pure logic, byte-identical to `apps/web/src/domain/payments/megapay.ts`)
+  Legacy `_shared/megapay.ts` / `domain/megapay.ts` are thin re-export shims.
 - Frontend: `features/wallet/RealDepositPanel.tsx`, `services/megapay.ts`, `lib/real-wallet-events.ts`,
   `features/wallet/WalletPanels.tsx`, `pages/wallet/TransactionsPage.tsx`, `hooks/useWallet.ts`,
   `providers/wallet/real-wallet-provider.ts`, `providers/config.ts`, `domain/account.ts`

@@ -13,6 +13,7 @@ import {
   digitPayoutRate,
   validateRealTradeRequest,
 } from '../_shared/digit-contracts.ts'
+import { tradingFeesFromMap, type SettingsMap } from '../_shared/payment-settings.ts'
 import {
   DerivSession,
   TRADE_COLUMNS,
@@ -20,25 +21,46 @@ import {
   corsHeaders,
   fetchFreshTick,
   json,
-  realTradingEnabled,
   userFromRequest,
 } from '../_shared/trading-server.ts'
 
-const PLACE_ERRORS: Record<string, { status: number; message: string }> = {
-  real_trading_disabled: { status: 403, message: 'Real trading is paused right now.' },
-  daily_limit_reached: { status: 403, message: DAILY_LIMIT_MESSAGE },
-  insufficient_funds: { status: 400, message: 'Insufficient REAL balance for this stake.' },
-  too_many_open_trades: {
-    status: 429,
-    message: `You already have ${REAL_MAX_OPEN_TRADES} open REAL trades. Wait for one to settle.`,
-  },
-  stale_entry_tick: { status: 503, message: 'The live price moved on before your trade could open. Please try again.' },
-  invalid_stake: { status: 400, message: `Stake must be between $${REAL_STAKE_MIN} and $${REAL_STAKE_MAX}.` },
-  invalid_duration: { status: 400, message: 'Select a valid duration (1–10 ticks).' },
-  wallet_not_found: { status: 409, message: 'Your REAL wallet is not ready yet. Please contact support.' },
-  wallet_not_ready: { status: 409, message: 'Your REAL wallet is not ready yet. Please contact support.' },
+const REAL_TRADING_ENDED = 'Real trading has ended. You can still withdraw your REAL balance from the Wallet page.'
+
+function placeErrors(stakeMin: number, stakeMax: number, maxOpen: number): Record<string, { status: number; message: string }> {
+  return {
+    real_trading_disabled: { status: 403, message: REAL_TRADING_ENDED },
+    daily_limit_reached: { status: 403, message: DAILY_LIMIT_MESSAGE },
+    insufficient_funds: { status: 400, message: 'Insufficient REAL balance for this stake.' },
+    too_many_open_trades: {
+      status: 429,
+      message: `You already have ${maxOpen} open REAL trades. Wait for one to settle.`,
+    },
+    stale_entry_tick: { status: 503, message: 'The live price moved on before your trade could open. Please try again.' },
+    invalid_stake: { status: 400, message: `Stake must be between $${stakeMin} and $${stakeMax}.` },
+    invalid_duration: { status: 400, message: 'Select a valid duration (1–10 ticks).' },
+    wallet_not_found: { status: 409, message: 'Your REAL wallet is not ready yet. Please contact support.' },
+    wallet_not_ready: { status: 409, message: 'Your REAL wallet is not ready yet. Please contact support.' },
+  }
 }
 const NOT_CHARGED = 'Could not place the trade. Your balance was not charged.'
+
+async function loadTradingFees(admin: ReturnType<typeof adminClient>) {
+  const { data, error } = await admin.from('trading_settings').select('key, value')
+  if (error) console.error('trading_settings load', error.message)
+  const map: SettingsMap = {}
+  for (const row of data ?? []) {
+    const key = String((row as { key?: unknown }).key ?? '')
+    if (!key) continue
+    map[key] = String((row as { value?: unknown }).value ?? '')
+  }
+  const fees = tradingFeesFromMap(map)
+  return {
+    stakeMin: fees.stakeMinUsd || REAL_STAKE_MIN,
+    stakeMax: fees.stakeMaxUsd || REAL_STAKE_MAX,
+    maxOpen: fees.maxOpenTrades || REAL_MAX_OPEN_TRADES,
+    dailyLimit: fees.dailyProfitLimitUsd,
+  }
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -47,7 +69,10 @@ Deno.serve(async (req) => {
   const user = await userFromRequest(admin, req)
   if (!user) return json({ error: 'Sign in to trade.' }, 401)
 
-  const enabled = await realTradingEnabled(admin)
+  // The site is DEMO-only: no new REAL trades, whatever trading_settings says.
+  const enabled = false
+  const trading = await loadTradingFees(admin)
+  const PLACE_ERRORS = placeErrors(trading.stakeMin, trading.stakeMax, trading.maxOpen)
 
   if (req.method === 'GET') {
     const { data: daily, error: dailyError } = await admin.rpc('real_trade_daily_status', { p_user_id: user.id })
@@ -56,17 +81,18 @@ Deno.serve(async (req) => {
       enabled,
       house_margin: HOUSE_MARGIN,
       daily_limit_reached: daily?.reached === true,
-      daily_limit_usd: daily?.limit ?? null,
-      stake_min: REAL_STAKE_MIN,
-      stake_max: REAL_STAKE_MAX,
-      max_open_trades: REAL_MAX_OPEN_TRADES,
+      daily_limit_usd: daily?.limit ?? trading.dailyLimit,
+      stake_min: trading.stakeMin,
+      stake_max: trading.stakeMax,
+      max_open_trades: trading.maxOpen,
       durations_ms: TRADE_DURATIONS.map((item) => item.ms),
       duration_ticks: { min: TICK_DURATION_MIN, max: TICK_DURATION_MAX, default: TICK_DURATION_DEFAULT },
       symbols: REAL_TRADE_SYMBOLS,
-      message: enabled ? null : 'Real trading is paused right now.',
+      message: enabled ? null : REAL_TRADING_ENDED,
     })
   }
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  if (!enabled) return json({ error: PLACE_ERRORS.real_trading_disabled.message }, 403)
 
   let body: Record<string, unknown>
   try {
@@ -76,7 +102,7 @@ Deno.serve(async (req) => {
   }
   if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'Invalid request.' }, 400)
 
-  const parsed = validateRealTradeRequest(body)
+  const parsed = validateRealTradeRequest(body, { stakeMin: trading.stakeMin, stakeMax: trading.stakeMax })
   if (!parsed.ok) return json({ error: parsed.error }, 400)
   if (!enabled) return json({ error: PLACE_ERRORS.real_trading_disabled.message }, 403)
   const input = parsed.value

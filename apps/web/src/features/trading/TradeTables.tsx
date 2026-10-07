@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { DataTable, EmptyState, Skeleton, Tabs, Badge } from '@/components/ui'
 import { formatContractTicket, lastDigitOfPrice } from '@/domain/contracts'
+import { settledResult } from '@/domain/trade-result'
 import { useWalletHistory } from '@/hooks/useWallet'
 import { useTrades } from '@/hooks/useTrades'
 import { formatMoney, formatPrice } from '@/lib/format'
@@ -29,8 +30,8 @@ function contractCell(trade: Trade): string {
 }
 
 function resultCell(trade: Trade): string {
-  const status = trade.result || trade.status
-  if (status === 'cancelled') return `REFUNDED (no exit tick) · P/L ${formatMoney(trade.profitLoss)}`
+  const result = settledResult(trade)
+  if (result === 'REFUNDED') return `REFUNDED (no exit tick) · P/L ${formatMoney(trade.profitLoss)}`
   const exitDigit =
     trade.exitDigit != null
       ? trade.exitDigit
@@ -38,7 +39,8 @@ function resultCell(trade: Trade): string {
         ? lastDigitOfPrice(trade.exitPrice)
         : null
   const digit = exitDigit != null ? ` · digit ${exitDigit}` : ''
-  return `${status.toUpperCase()}${digit} · P/L ${formatMoney(trade.profitLoss)}`
+  const label = result === 'OPEN' ? (trade.status || 'open').toUpperCase() : result
+  return `${label}${digit} · P/L ${formatMoney(trade.profitLoss)}`
 }
 
 function tradeRows(trades: Trade[], mode: 'open' | 'history', now: number) {

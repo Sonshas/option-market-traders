@@ -67,12 +67,14 @@ migrations or the web bundle (the Paybill shown in the UI comes from the server 
 
 - Edge Functions: `mpesa-deposit` (verify_jwt on), `mpesa-status` and `mpesa-callback` (verify_jwt off; status
   does its own user auth, and the sweep/health modes require the Vault `real_trade_sweep_secret`).
-- Shared: `supabase/functions/_shared/daraja.ts` (pure, byte-identical to `apps/web/src/domain/daraja.ts`,
-  enforced by `daraja.test.ts`) and `_shared/daraja-server.ts` (OAuth, STK push/query, reconciliation).
+- Shared: `supabase/functions/_shared/payments/daraja.ts` (pure, byte-identical to
+  `apps/web/src/domain/payments/daraja.ts`, enforced by `payments/daraja.test.ts`) and
+  `_shared/payments/daraja-server.ts` (OAuth, STK push/query, reconciliation).
+  Legacy `_shared/daraja.ts` / `domain/daraja.ts` paths are thin re-export shims.
   Deploy with `npx supabase functions deploy <name> --project-ref wkfyavcjjuyzvyeprklz --use-api`
-  (`--no-verify-jwt` for `mpesa-callback` and `mpesa-status`). Redeploy all three when `_shared/daraja*.ts`,
-  `server.ts` or `megapay.ts` change.
-- Migration: `supabase/migrations/20261004090000_daraja_deposits.sql`.
+  (`--no-verify-jwt` for `mpesa-callback` and `mpesa-status`). Redeploy all three when `_shared/payments/daraja*.ts`,
+  `server.ts` or `payments/megapay.ts` change.
+- Migration: `supabase/migrations/20260920111952_smartbasebinary_host_schema.sql` (section `from: 20261004090000_daraja_deposits.sql`).
 - Web: `services/deposits.ts` (provider switch), `features/wallet/RealDepositPanel.tsx`.
 - Caddy: `handle /api/mpesa/callback` in `deploy/vultr/Caddyfile`.
 

@@ -24,7 +24,6 @@ import { contractOptionLabel } from '@/domain/contracts'
 import { PREDICTION_CLEARED } from '@/domain/prediction'
 import { predictionStore } from '@/lib/prediction-store'
 import { getAutoTradeSnapshot, stopAutoTrade } from '@/providers/bots/demo-auto-trader'
-import { getMarketDataProviderId, isMarketDataProviderConfigured } from '@/providers/market-data/env'
 import { defaultRealDerivSymbol } from '@/providers/market-data/deriv-symbols'
 import type { ConnectionStatus, Timeframe } from '@/types'
 
@@ -43,7 +42,7 @@ export function TradingPage() {
   const { kind } = useAccountMode()
   const { markets, status: socketStatus } = useMarkets()
   const [params, setParams] = useSearchParams()
-  const defaultSymbol = getMarketDataProviderId() === 'binance' ? 'BTCUSDT' : defaultRealDerivSymbol()
+  const defaultSymbol = defaultRealDerivSymbol()
 
   // Reset market URL when switching DEMO ↔ REAL so stale symbols never leak across modes.
   useEffect(() => {
@@ -73,8 +72,6 @@ export function TradingPage() {
   const { enabled: realTradingEnabled } = useRealTradingConfig(kind)
   const allTrades = useMemo(() => [...openTrades, ...tradeHistory], [openTrades, tradeHistory])
   const tradeAnimation = useTradeResultAnimation({ kind, trades: allTrades, ticks, symbol: activeSymbol })
-  const feedConfigured = isMarketDataProviderConfigured()
-
   // Auto Trade only runs while this page shows the same account mode and market it started on.
   useEffect(() => {
     const running = getAutoTradeSnapshot().session
@@ -108,10 +105,9 @@ export function TradingPage() {
   const pipSize = liveTick?.pipSize ?? null
 
   const hasChartData = chartMode === 'ticks' ? ticks.length > 0 : (snapshot?.candles.length ?? 0) > 0
-  const unavailableNote = !feedConfigured
-    ? 'Live prices are not available right now.'
-    : !hasChartData && (displayStatus === 'error' || displayStatus === 'disconnected')
-      ? 'Live prices are temporarily unavailable. Retrying automatically.'
+  const unavailableNote =
+    !hasChartData && (displayStatus === 'error' || displayStatus === 'disconnected')
+      ? 'Simulated prices are loading.'
       : null
 
   const priceLines = useMemo<ChartPriceLine[]>(

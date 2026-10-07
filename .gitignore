@@ -1,25 +1,52 @@
+# Dependencies
 node_modules/
-dist/
-dist-ssr/
 
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment (never commit secrets)
 .env
 .env.local
-.env.development
-.env.development.local
-.env.production
-.env.production.local
-.env.test
-.env.test.local
+.env.*.local
+!.env.example
+apps/web/.env
+apps/web/.env.production
+deploy/vultr/deploy.local.env
 
+# Logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
+yarn-error.log*
 pnpm-debug.log*
 
-.vscode/
-.idea/
+# Vite
+.vite/
+.verify/
+
+# Supabase CLI local state
+supabase/.temp/
+
+# Local agent / editor config
+.cursor/
+
+# Local screenshots / scratch
+*-screenshots/
+/20261007150000_superadmin_panel.sql
+
+# Test / coverage
+coverage/
+
+# OS
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-.vite/
-*.tsbuildinfo
+# Editor
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp

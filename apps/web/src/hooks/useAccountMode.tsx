@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react'
 import { setActiveAccountMode } from '@/lib/active-account-mode'
 import { ACCOUNT_MODE_STORAGE_KEY } from '@/providers/config'
 import type { AccountMode } from '@/types'
@@ -12,52 +12,24 @@ interface AccountModeContextValue {
 
 const AccountModeContext = createContext<AccountModeContextValue | null>(null)
 
-function readStoredMode(): AccountMode {
-  try {
-    const raw = localStorage.getItem(ACCOUNT_MODE_STORAGE_KEY)
-    if (raw === 'real' || raw === 'demo') return raw
-    if (raw === 'live') return 'real'
-  } catch {
-    /* ignore */
-  }
-  return 'demo'
-}
+const DEMO: AccountMode = 'demo'
 
-function persistMode(mode: AccountMode): void {
-  try {
-    localStorage.setItem(ACCOUNT_MODE_STORAGE_KEY, mode)
-  } catch {
-    /* ignore */
-  }
-}
-
+/** The site is DEMO-only: trading always uses the DEMO practice account. */
 export function AccountModeProvider({ children }: { children: ReactNode }) {
-  const [kind, setKindState] = useState<AccountMode>(() => {
-    const stored = readStoredMode()
-    setActiveAccountMode(stored)
-    return stored
-  })
+  setActiveAccountMode(DEMO)
 
   useEffect(() => {
-    persistMode(kind)
-    setActiveAccountMode(kind)
-  }, [kind])
-
-  const setKind = useCallback((next: AccountMode) => {
-    const mode = next === 'real' ? 'real' : 'demo'
-    setActiveAccountMode(mode)
-    setKindState(mode)
+    try {
+      localStorage.setItem(ACCOUNT_MODE_STORAGE_KEY, DEMO)
+    } catch {
+      /* ignore */
+    }
   }, [])
 
-  const value = useMemo(
-    () => ({
-      kind,
-      mode: kind,
-      setKind,
-      setMode: setKind,
-    }),
-    [kind, setKind],
-  )
+  const value = useMemo(() => {
+    const setKind = () => setActiveAccountMode(DEMO)
+    return { kind: DEMO, mode: DEMO, setKind, setMode: setKind }
+  }, [])
 
   return <AccountModeContext.Provider value={value}>{children}</AccountModeContext.Provider>
 }

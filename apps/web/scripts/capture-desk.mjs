@@ -123,7 +123,6 @@ for (const viewport of [
     await page.getByRole('tab', { name: /EVEN \/ ODD/i }).click()
     await page.getByRole('button', { name: '$5', exact: true }).click()
     await page.getByTestId('auto-trade-start').click()
-    await page.getByRole('button', { name: /Start DEMO Auto Trade/i }).click()
     await page.getByTestId('auto-trade-status').waitFor({ timeout: 10000 })
     await page.waitForTimeout(16000)
     const autoFile = resolve(outDir, 'desk-autotrade-demo.png')

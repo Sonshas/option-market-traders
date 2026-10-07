@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/domain/outcome/demo-win-rate', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/domain/outcome/demo-win-rate')>()),
+  demoExitDigit: (_contract: unknown, natural: number) => natural,
+}))
 import { AUTO_TRADE_DEFAULTS, type AutoAccount, type AutoTradeSettings } from '@/domain/auto-trade'
+import { contractCanWin } from '@/domain/digit-contracts'
 import { loadDemoState, resetDemoState } from '@/lib/demo-store'
 import {
   REAL_CONNECTION_INACTIVE,
@@ -99,16 +105,24 @@ function fakeExecutor(
   return { executor, placed, spy: vi.spyOn(executor, 'execute') }
 }
 
+const RESULT_PAUSE = 4_500
+
 function engineWith(
   demo: AccountExecutor,
   real: AccountExecutor,
-  patch: { lastTickAt?: (s: string) => number; mode?: AutoAccount; prediction?: LoadedPrediction | null } = {},
+  patch: {
+    lastTickAt?: (s: string) => number
+    mode?: AutoAccount
+    prediction?: LoadedPrediction | null
+    sleep?: (ms: number) => Promise<void>
+  } = {},
 ) {
   return createAutoTradeEngine({
     executors: { demo, real },
     currentPrediction: () => (patch.prediction === undefined ? EVEN_R100 : patch.prediction),
     currentMode: () => patch.mode ?? 'DEMO',
-    sleep: async () => undefined,
+    sleep: patch.sleep ?? (async () => undefined),
+    resultPauseMs: RESULT_PAUSE,
     now: () => 1_700_000_000_000,
     quote: () => 1234.56,
     ensureFeed: () => undefined,
@@ -190,6 +204,23 @@ describe('Auto Trade start rules', () => {
     expect(demo.spy).not.toHaveBeenCalled()
   })
 
+  it('DEMO self-picks a winnable digit contract on the market when no prediction is loaded', async () => {
+    const demo = fakeExecutor('DEMO', { outcomes: Array(40).fill('won') })
+    const engine = engineWith(demo.executor, fakeExecutor('REAL').executor, { prediction: null })
+    expect(engine.start(settingsFor('DEMO', { targetProfit: 30 }), 'DEMO', { selfPickSymbol: 'R_50' }).ok).toBe(true)
+    expect(await untilStopped(engine)).toMatch(/Target profit/)
+    expect(demo.placed.length).toBeGreaterThan(0)
+    for (const order of demo.placed) {
+      expect(order.symbol).toBe('R_50')
+      expect(contractCanWin(order.selection)).toBe(true)
+    }
+  })
+
+  it('REAL never self-picks', () => {
+    const engine = engineWith(fakeExecutor('DEMO').executor, fakeExecutor('REAL').executor, { mode: 'REAL', prediction: null })
+    expect(engine.start(settingsFor('REAL'), 'REAL', { realConfirmed: true, selfPickSymbol: 'R_50' }).ok).toBe(false)
+  })
+
   it('stopIfNotMode ends a run when the account mode changes', async () => {
     const real = fakeExecutor('REAL', { outcomes: Array(40).fill('won') })
     const engine = engineWith(fakeExecutor('DEMO').executor, real.executor, { mode: 'REAL' })
@@ -235,6 +266,30 @@ describe.each(['DEMO', 'REAL'] as const)('%s Auto Trade stop rules (mocked execu
     const { engine } = setup({ outcomes: Array(10).fill('lost') })
     engine.start(settingsFor(account, { baseStake: 10, multiplier: 1, stopLoss: 30, maxLossStreak: 10 }), account, opts)
     expect(await untilStopped(engine)).toMatch(/Stop loss reached/)
+  })
+
+  it.each([
+    { limit: 'target profit', outcome: 'won' as const, patch: { targetProfit: 18 }, trades: 2, reason: /Target profit reached \(\+\$18\.00\)/ },
+    { limit: 'stop loss', outcome: 'lost' as const, patch: { stopLoss: 30 }, trades: 3, reason: /Stop loss reached \(−\$30\.00\)/ },
+  ])('stops as soon as the settled trade hits the $limit, with no further order', async ({ outcome, patch, trades, reason }) => {
+    const sleeps: number[] = []
+    const { own, engine } = setup(
+      { outcomes: Array(10).fill(outcome) },
+      {
+        sleep: async (ms) => {
+          sleeps.push(ms)
+        },
+      },
+    )
+    const settings = settingsFor(account, { baseStake: 10, multiplier: 1, maxLossStreak: 10, targetProfit: 1000, stopLoss: 1000, ...patch })
+    expect(engine.start(settings, account, opts).ok).toBe(true)
+    expect(await untilStopped(engine)).toMatch(reason)
+    expect(own.placed).toHaveLength(trades)
+    expect(sleeps.filter((ms) => ms === RESULT_PAUSE)).toHaveLength(trades - 1)
+    const snap = engine.getSnapshot()
+    expect(snap.session?.phase).toBe('stopped')
+    expect(snap.nextStake).toBeNull()
+    expect(snap.progress.openTrades).toBe(0)
   })
 
   it('stops after the number of trades', async () => {
@@ -329,9 +384,9 @@ describe('DEMO Auto Trade on the real DEMO provider', () => {
       currentPrediction: () => EVEN_R100,
       currentMode: () => 'DEMO',
       sleep: async () => {
-        // Each poll: one new odd-digit live tick arrives (EVEN loses).
+        // Each poll: exit digit 9 → LOSS for EVEN under natural contract rules.
         clock += 2000
-        recordTicks('R_100', [tick(100.05, clock)])
+        recordTicks('R_100', [tick(100.09, clock)])
         settleDemoTrades(clock + 100)
       },
       now: () => clock,
@@ -343,7 +398,7 @@ describe('DEMO Auto Trade on the real DEMO provider', () => {
     expect(await untilStopped(engine)).toMatch(/3 losses in a row/)
     const trades = loadDemoState().trades
     expect(trades.map((t) => t.stake).sort()).toEqual([1, 2, 4])
-    expect(trades.every((t) => t.status === 'lost' && t.exitDigit === 5)).toBe(true)
+    expect(trades.every((t) => t.status === 'lost' && t.exitDigit === 9)).toBe(true)
     expect(engine.getSnapshot().progress.realizedPnl).toBe(-7)
   })
 })

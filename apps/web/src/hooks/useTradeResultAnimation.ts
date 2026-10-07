@@ -1,6 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { digitOfTick } from '@/domain/digit-stats'
 import { createTradeResultAnimator, type TradeResultAnimationState } from '@/features/trading/trade-result-animation'
+import { usePracticeBook } from '@/hooks/usePracticeBook'
 import type { AccountMode, Tick, Trade } from '@/types'
 
 /**
@@ -19,6 +20,7 @@ export function useTradeResultAnimation({
   symbol: string
 }): TradeResultAnimationState {
   const [animator] = useState(() => createTradeResultAnimator())
+  const { book } = usePracticeBook()
   const latestTick = ticks.length > 0 ? ticks[ticks.length - 1]! : null
   const pipSize = latestTick?.pipSize ?? null
 
@@ -27,6 +29,13 @@ export function useTradeResultAnimation({
   useEffect(() => {
     animator.setAccountMode(kind)
   }, [animator, kind])
+
+  const bookRef = useRef(book)
+  useEffect(() => {
+    if (bookRef.current === book) return
+    bookRef.current = book
+    animator.reset()
+  }, [animator, book])
 
   useEffect(() => {
     if (!latestTick || latestTick.isSimulated) return

@@ -1,6 +1,6 @@
 import type { ConnectionStatus, Market } from '@/types'
 import { DERIV_PREFERRED_SYMBOLS } from '@/providers/market-data/deriv-digits'
-import { REAL_FEED_LABEL_DERIV } from '@/providers/market-data/env'
+import { SIMULATED_FEED_LABEL } from '@/providers/market-data/simulated-provider'
 
 /** Deriv rejects candle granularities under 60 s (InputValidationFailed), so there are no 5s/15s/30s candles. */
 export const DERIV_REAL_TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '4h', '1d'] as const
@@ -118,7 +118,7 @@ export function buildDerivMarketCatalog(
       durationsMs: [5_000, 10_000, 15_000, 30_000, 60_000],
       lastPrice: last ?? null,
       priceStatus,
-      feedLabel: REAL_FEED_LABEL_DERIV,
+      feedLabel: SIMULATED_FEED_LABEL,
       isSimulated: false,
       ...(entry.submarket ? { submarket: entry.submarket } : {}),
       pipSize: entry.pipSize,

@@ -114,12 +114,12 @@ describe('Digit Scanner', () => {
 describe('ticket labels', () => {
   const even = { contractType: 'EVEN_ODD', contractOption: 'even', selectedDigit: null, barrier: null } as const
 
-  it('shows payout from the server rate', () => {
+  it('shows payout from natural contract pricing (EVEN 50% → 90% profit rate)', () => {
     expect(directionPayoutLabel(10, even)).toBe('Payout $19.00')
     expect(payoutSummary(10, even)).toBe('$19.00 USD • 90.00%')
     expect(directionPayoutLabel(50, even)).toBe('Payout $95.00')
-    const dead = { contractType: 'OVER_UNDER', contractOption: 'over', selectedDigit: null, barrier: 9 } as const
-    expect(directionPayoutLabel(10, dead)).toBe('Payout $0.00 · cannot win')
+    const overNine = { contractType: 'OVER_UNDER', contractOption: 'over', selectedDigit: null, barrier: 9 } as const
+    expect(directionPayoutLabel(10, overNine)).toBe('Payout $0.00 · cannot win')
   })
 
   it('never claims 1 second where ticks are 2 seconds apart', () => {

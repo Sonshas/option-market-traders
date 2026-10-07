@@ -34,8 +34,8 @@ pg_cron (every minute) ── POST real-trade-settle  (x-sweep-secret, sweep all
 | Server helpers (Deriv socket, settlement loop) | `supabase/functions/_shared/trading-server.ts` |
 | Place trade | `supabase/functions/real-trade` (`verify_jwt = true`). `GET` returns the public config. |
 | Settle | `supabase/functions/real-trade-settle` (`verify_jwt = false`; auth is either a user JWT or the Vault sweep secret) |
-| Money functions | `supabase/migrations/20261003120000_real_trading_engine.sql`, replaced by `20261003170000_real_trading_payout_model.sql` (probability payouts, barrier digit loses, daily limit, `trading_settings`); `20261003200000_real_trading_tick_duration.sql` adds tick contracts (`duration_ticks`, `tick_anchor_epoch`, `place_real_tick_trade`, tick branch in `settle_real_trade` / `refund_real_trade`) |
-| Cron sweep | `supabase/migrations/20261003120100_real_trading_settlement_cron.sql` — job `real-trade-settle-sweep`, `* * * * *` |
+| Money functions | `supabase/migrations/20260920111952_smartbasebinary_host_schema.sql` (sections: real trading engine, payout model, tick duration, payment settings, stake bounds, 90% win rate — see `MIGRATION_MANIFEST.md`) |
+| Cron sweep | Same consolidated file — job `real-trade-settle-sweep`, `* * * * *` |
 | Frontend | `providers/trading/real-trading-provider.ts`, `services/real-trading.ts`, `hooks/useRealTradingConfig.ts`, `features/trading/TradeTicket.tsx` |
 
 The client never sends a price, payout or outcome. It sends only symbol, contract, digit/barrier, stake,

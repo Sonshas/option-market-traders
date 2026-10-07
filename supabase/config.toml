@@ -1,0 +1,42 @@
+# Smart Base Binary — host Supabase project (linked CLI target).
+# Payout desk is a separate Supabase project; see supabase/payout-desk/.
+
+project_id = "wkfyavcjjuyzvyeprklz"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "https://optionmarkettraders.com"
+additional_redirect_urls = ["https://optionmarkettraders.com/**", "http://localhost:5173/**"]
+
+[edge_runtime]
+enabled = true
+
+[analytics]
+enabled = false

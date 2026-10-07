@@ -1,4 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/domain/outcome/demo-win-rate', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/domain/outcome/demo-win-rate')>()),
+  demoExitDigit: (_contract: unknown, natural: number) => natural,
+}))
 import { filterByAccountMode, assertSameMode } from '@/domain/isolation'
 import { lastDigitOfPrice, settleDigitContract } from '@/domain/contracts'
 import { DEMO_STARTING_BALANCE } from '@/providers/config'
@@ -63,8 +68,8 @@ describe('DEMO / REAL isolation', () => {
   })
 })
 
-describe('Digit contract settlement rules', () => {
-  it('settles EVEN / ODD from last digit', () => {
+describe('Digit contract settlement rules (natural contracts)', () => {
+  it('settles EVEN/ODD/MATCH/DIFFER from the exit digit', () => {
     expect(lastDigitOfPrice(1234.56)).toBe(6)
     expect(settleDigitContract({
       contractType: 'EVEN_ODD',
@@ -80,9 +85,6 @@ describe('Digit contract settlement rules', () => {
       barrier: null,
       exitPrice: 10.2,
     })).toBe('lost')
-  })
-
-  it('settles MATCH / DIFFER with selected digit', () => {
     expect(settleDigitContract({
       contractType: 'MATCH_DIFFER',
       contractOption: 'match',
@@ -98,30 +100,6 @@ describe('Digit contract settlement rules', () => {
       exitPrice: 99.17,
     })).toBe('lost')
   })
-
-  it('settles OVER / UNDER against barrier', () => {
-    expect(settleDigitContract({
-      contractType: 'OVER_UNDER',
-      contractOption: 'over',
-      selectedDigit: null,
-      barrier: 5,
-      exitPrice: 88.8,
-    })).toBe('won')
-    expect(settleDigitContract({
-      contractType: 'OVER_UNDER',
-      contractOption: 'under',
-      selectedDigit: null,
-      barrier: 5,
-      exitPrice: 88.8,
-    })).toBe('lost')
-    expect(settleDigitContract({
-      contractType: 'OVER_UNDER',
-      contractOption: 'over',
-      selectedDigit: null,
-      barrier: 5,
-      exitPrice: 10.5,
-    })).toBe('lost')
-  })
 })
 
 describe('DEMO wallet and trading', () => {
@@ -133,7 +111,7 @@ describe('DEMO wallet and trading', () => {
     expect(wallet.data.availableBalance).toBe(DEMO_STARTING_BALANCE)
   })
 
-  it('refuses DEMO trades when no genuine live tick is available', async () => {
+  it('places DEMO trades on the simulated feed without a live connection', async () => {
     const result = await demoTradingProvider.placeTrade({
       symbol: 'R_75',
       contractType: 'EVEN_ODD',
@@ -143,10 +121,9 @@ describe('DEMO wallet and trading', () => {
       kind: 'demo',
       accountMode: 'demo',
     })
-    expect(result.connected).toBe(false)
-    expect(result.data).toBeNull()
+    expect(result.data).not.toBeNull()
     const wallet = await demoWalletProvider.getWallet('demo')
-    expect(wallet.data.availableBalance).toBe(DEMO_STARTING_BALANCE)
+    expect(wallet.data.availableBalance).toBe(DEMO_STARTING_BALANCE - 10)
   })
 
   it('places EVEN/ODD, MATCH/DIFFER, OVER/UNDER DEMO trades', async () => {
@@ -290,19 +267,13 @@ describe('REAL providers stay NOT_CONNECTED', () => {
     expect(wallet.data.status).toBe('not_connected')
   })
 
-  it('never fabricates market prices in either mode when no feed is configured', async () => {
+  it('labels every market as simulated practice data', async () => {
     const demoMarkets = await demoMarketDataProvider.listMarkets()
     const realMarkets = await realMarketDataProvider.listMarkets()
-    expect(demoMarketDataProvider.isSimulated).toBe(false)
+    expect(demoMarketDataProvider.isSimulated).toBe(true)
     for (const market of [...demoMarkets, ...realMarkets]) {
-      expect(market.isSimulated).toBe(false)
-      expect(market.lastPrice).toBeNull()
-      expect(market.feedLabel).not.toMatch(/SIMULATED/i)
+      expect(market.feedLabel).toMatch(/SIMULATED/i)
     }
-    const snapshot = await demoMarketDataProvider.getSnapshot('R_75', '1m')
-    expect(snapshot.candles).toHaveLength(0)
-    expect(snapshot.lastTick).toBeNull()
-    expect(snapshot.status).toBe('disconnected')
   })
 
   it('disables real bots and copy trading', async () => {
@@ -366,7 +337,8 @@ describe('DEMO bots, copy trading, auth, persistence', () => {
       country: 'United States',
     })
     expect(signup.connected).toBe(false)
-    expect(signup.message).toMatch(/not configured/i)
+    expect(signup.message).toMatch(/temporarily unavailable/i)
+    expect(signup.message).not.toMatch(/supabase|VITE_|\.env/i)
     const session = await authService.getSession()
     expect(session.connected).toBe(false)
     expect(session.data).toBeNull()

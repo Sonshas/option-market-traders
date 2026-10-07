@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeAuthLinks, parseAuthCallback, plainAuthMessage } from '@/lib/auth-link'
+import { AUTH_FALLBACK, mergeAuthLinks, parseAuthCallback, plainAuthMessage } from '@/lib/auth-link'
 
 describe('parseAuthCallback', () => {
   it('reads a recovery token hash', () => {
@@ -42,7 +42,9 @@ describe('parseAuthCallback', () => {
 })
 
 describe('plainAuthMessage', () => {
-  it('keeps unknown errors and maps the auth cases people hit', () => {
+  it('hides unknown and database errors, and maps the auth cases people hit', () => {
+    expect(plainAuthMessage('Database error saving new user')).toBe(AUTH_FALLBACK)
+    expect(plainAuthMessage('relation "public.users" does not exist')).toBe(AUTH_FALLBACK)
     expect(plainAuthMessage('Email not confirmed')).toBe(
       'Email not confirmed. Open the link in your inbox, or resend the confirmation email.',
     )
@@ -55,6 +57,6 @@ describe('plainAuthMessage', () => {
     expect(plainAuthMessage('For security purposes, you can only request this once every 60 seconds')).toMatch(
       /Wait a minute/,
     )
-    expect(plainAuthMessage('Something unexpected from the server')).toBe('Something unexpected from the server')
+    expect(plainAuthMessage('Something unexpected from the server')).toBe(AUTH_FALLBACK)
   })
 })

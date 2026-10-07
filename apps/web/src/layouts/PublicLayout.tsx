@@ -77,9 +77,6 @@ export function PublicLayout() {
             <NavLink to="/legal/risk" className={footerLink}>
               Risk notice
             </NavLink>
-            <NavLink to="/admin" className={footerLink}>
-              Admin preview
-            </NavLink>
           </FooterColumn>
         </div>
         <div className="border-t border-line">

@@ -5,6 +5,12 @@ import {
 } from '@/domain/account'
 import { assertSameMode } from '@/domain/isolation'
 import { createId, nowIso } from '@/lib/ids'
+import {
+  PRACTICE_STORAGE_KEY,
+  getPracticeBook,
+  subscribePracticeBook,
+  type PracticeBook,
+} from '@/lib/practice-book'
 import { DEMO_STARTING_BALANCE, DEMO_STORAGE_KEY } from '@/providers/config'
 import type {
   Account,
@@ -39,7 +45,33 @@ export interface DemoState {
 
 const listeners = new Set<() => void>()
 
+function storageKeyFor(book: PracticeBook): string {
+  return book === 'practice' ? PRACTICE_STORAGE_KEY : DEMO_STORAGE_KEY
+}
+
+function storageKey(): string {
+  return storageKeyFor(getPracticeBook())
+}
+
+/** Practice books saved before Practice had a balance held this hidden placeholder amount. */
+const LEGACY_PRACTICE_NOMINAL_BALANCE = 1_000_000_000
+
+function withoutLegacyPracticeWallet(state: DemoState): DemoState {
+  if (getPracticeBook() !== 'practice') return state
+  if ((state.wallet.availableBalance ?? 0) < LEGACY_PRACTICE_NOMINAL_BALANCE) return state
+  return {
+    ...state,
+    wallet: {
+      ...state.wallet,
+      balance: DEMO_STARTING_BALANCE,
+      availableBalance: DEMO_STARTING_BALANCE,
+      lockedBalance: 0,
+    },
+  }
+}
+
 function emptyWallet(now: string): Wallet {
+  const balance = DEMO_STARTING_BALANCE
   return {
     id: DEMO_WALLET_ID,
     userId: DEMO_USER_ID,
@@ -47,8 +79,8 @@ function emptyWallet(now: string): Wallet {
     accountMode: 'demo',
     kind: 'demo',
     currency: 'USD',
-    balance: DEMO_STARTING_BALANCE,
-    availableBalance: DEMO_STARTING_BALANCE,
+    balance,
+    availableBalance: balance,
     lockedBalance: 0,
     status: 'ready',
     isSimulated: true,
@@ -82,7 +114,14 @@ export function createInitialDemoState(now = Date.now()): DemoState {
   }
 }
 
-let memory: DemoState | null = null
+/** One cached state per book, keyed by storage key; each book keeps its own balance and trades. */
+const memory = new Map<string, DemoState>()
+
+subscribePracticeBook(() => {
+  // With storage available, re-read the newly active book so it reflects any other tab's changes.
+  if (canUseStorage()) memory.clear()
+  listeners.forEach((listener) => listener())
+})
 
 function canUseStorage(): boolean {
   try {
@@ -119,37 +158,67 @@ function revive(raw: DemoState): DemoState {
 }
 
 export function loadDemoState(): DemoState {
-  if (memory) return memory
+  const key = storageKey()
+  const cached = memory.get(key)
+  if (cached) return cached
   if (canUseStorage()) {
-    const raw = localStorage.getItem(DEMO_STORAGE_KEY)
+    const raw = localStorage.getItem(key)
     if (raw) {
       try {
-        memory = revive(JSON.parse(raw) as DemoState)
-        return memory
+        const state = withoutLegacyPracticeWallet(revive(JSON.parse(raw) as DemoState))
+        memory.set(key, state)
+        return state
       } catch {
-        memory = createInitialDemoState()
-        persistDemoState(memory)
-        return memory
+        return resetDemoState()
       }
     }
   }
-  memory = createInitialDemoState()
-  persistDemoState(memory)
-  return memory
+  return resetDemoState()
 }
 
 export function persistDemoState(state: DemoState): void {
-  memory = state
+  const key = storageKey()
+  memory.set(key, state)
   if (canUseStorage()) {
-    localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(state))
+    localStorage.setItem(key, JSON.stringify(state))
   }
   listeners.forEach((listener) => listener())
 }
 
 export function resetDemoState(now = Date.now()): DemoState {
-  memory = createInitialDemoState(now)
-  persistDemoState(memory)
-  return memory
+  const state = createInitialDemoState(now)
+  persistDemoState(state)
+  return state
+}
+
+/**
+ * Sets one book's available balance to the server value (signed-in users: the server row is the
+ * source of truth). Locked stakes of open local trades are kept. Works for the inactive book too.
+ */
+export function applyServerAvailableBalance(book: PracticeBook, available: number, now = Date.now()): void {
+  if (!Number.isFinite(available) || available < 0) return
+  const key = storageKeyFor(book)
+  let state = memory.get(key) ?? null
+  if (!state && canUseStorage()) {
+    const raw = localStorage.getItem(key)
+    if (raw) {
+      try {
+        state = revive(JSON.parse(raw) as DemoState)
+      } catch {
+        state = null
+      }
+    }
+  }
+  if (!state) state = createInitialDemoState(now)
+  if (state.wallet.availableBalance === available) return
+  const locked = state.wallet.lockedBalance ?? 0
+  const next: DemoState = {
+    ...state,
+    wallet: { ...state.wallet, availableBalance: available, lockedBalance: locked, balance: available + locked, updatedAt: nowIso(now) },
+  }
+  memory.set(key, next)
+  if (canUseStorage()) localStorage.setItem(key, JSON.stringify(next))
+  listeners.forEach((listener) => listener())
 }
 
 export function subscribeDemoStore(listener: () => void): () => void {

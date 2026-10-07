@@ -7,7 +7,7 @@ import {
   b2cActive,
   b2cConfigured,
   b2cPaymentRequest,
-  withdrawConfig,
+  resolveWithdrawConfig,
   type WithdrawalRow,
 } from '../_shared/withdraw-server.ts'
 
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
   const { data: valid } = await admin.rpc('verify_real_trade_sweep_secret', { p_secret: sweepSecret })
   if (valid !== true) return json({ error: 'Unauthorized' }, 401)
 
-  const cfg = withdrawConfig()
+  const cfg = await resolveWithdrawConfig(admin)
   if (!b2cActive(cfg)) {
     const reason = cfg.mode !== 'daraja_b2c' ? `mode=${cfg.mode}` : 'B2C not configured'
     console.log('withdraw dispatch skipped:', reason)

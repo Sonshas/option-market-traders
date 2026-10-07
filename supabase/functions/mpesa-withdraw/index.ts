@@ -7,7 +7,7 @@ import {
   loadWithdrawal,
   publicWithdrawal,
   requestErrorMessage,
-  withdrawConfig,
+  resolveWithdrawConfig,
 } from '../_shared/withdraw-server.ts'
 import {
   NO_REAL_TRADE_MESSAGE,
@@ -27,10 +27,10 @@ const UNAVAILABLE = 'Withdrawals temporarily unavailable'
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const cfg = withdrawConfig()
   const admin = adminClient()
   const user = await userFromRequest(admin, req)
   if (!user) return json({ error: 'Sign in to withdraw.' }, 401)
+  const cfg = await resolveWithdrawConfig(admin)
 
   const { data: flag } = await admin.from('feature_flags').select('value').eq('key', 'REAL_WITHDRAWALS_ENABLED').maybeSingle()
   const enabled = flag == null || flag.value === true
@@ -49,7 +49,7 @@ Deno.serve(async (req) => {
       min_kes: cfg.minKes,
       max_kes: cfg.maxKes,
       min_usd: minUsdFor(cfg),
-      fee_kes: cfg.feeKes,
+      fee_kes: 0,
       processing_copy: processingTimeCopy(activeMode),
       message: enabled ? null : 'Withdrawals are paused for maintenance. Please try again later.',
     })
@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
       p_amount_usd: amount.amountUsd,
       p_msisdn: msisdn,
       p_kes_per_usd: cfg.kesPerUsd,
-      p_fee_kes: cfg.feeKes,
+      p_fee_kes: 0,
       p_min_kes: cfg.minKes,
       p_max_kes: cfg.maxKes,
       p_provider: activeMode,

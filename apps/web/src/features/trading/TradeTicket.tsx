@@ -3,6 +3,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Icon } from '@/components/icons'
 import { REAL_TRADE_LABEL } from '@/domain/account'
 import { CONTRACT_OPTIONS, CONTRACT_TYPES, defaultOptionFor, formatContractTicket } from '@/domain/contracts'
+import { usePracticeBook } from '@/hooks/usePracticeBook'
 import {
   CANNOT_WIN_WARNING,
   DAILY_LIMIT_MESSAGE,
@@ -29,6 +30,7 @@ import { STAKE_PRESETS } from '@/lib/constants'
 import { cn } from '@/lib/cn'
 import { formatMoney } from '@/lib/format'
 import { predictionStore } from '@/lib/prediction-store'
+import { ticketChartStore } from '@/lib/ticket-chart-store'
 import { ordinalSuffix } from '@/providers/trading/demo-trading-provider'
 import { isRealTradeSymbol, newIdempotencyKey } from '@/providers/trading/real-trading-provider'
 import { tradingProvider } from '@/services/trades'
@@ -201,6 +203,7 @@ export function TradeTicket({
   const [open, setOpen] = useState(false)
   const [riskOpen, setRiskOpen] = useState(false)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const { book } = usePracticeBook()
   const { loaded: loadedPrediction, notice: predictionNotice } = usePrediction()
   /** Id of the loaded prediction already written into the ticket (it waits for the market switch first). */
   const [appliedId, setAppliedId] = useState<string | null>(null)
@@ -211,10 +214,36 @@ export function TradeTicket({
   const [stakeError, setStakeError] = useState<string | undefined>()
 
   useEffect(() => {
-    setStake(kind === 'demo' ? '10' : '1')
+    setStake(kind === 'demo' ? '10' : String(REAL_STAKE_MIN))
     setStakeError(undefined)
     setMessage(null)
   }, [kind])
+
+  useEffect(() => {
+    setStakeError(undefined)
+    setMessage(null)
+  }, [book])
+
+  useEffect(() => {
+    if (isDemo || !realTrading.config) return
+    const min = realTrading.config.stakeMin
+    const max = realTrading.config.stakeMax
+    setStake((current) => {
+      const n = Number(current)
+      if (!Number.isFinite(n) || n < min) return String(min)
+      if (n > max) return String(max)
+      return current
+    })
+  }, [isDemo, realTrading.config?.stakeMin, realTrading.config?.stakeMax])
+
+  useEffect(() => {
+    ticketChartStore.set({
+      contractType,
+      contractOption: pendingOption,
+      selectedDigit,
+      barrier,
+    })
+  }, [contractType, pendingOption, selectedDigit, barrier])
 
   const autoRunning = auto.session?.status === 'running'
   const stakeNumber = Number(stake)
@@ -289,7 +318,10 @@ export function TradeTicket({
       ? !validStake
         ? 'Enter a stake greater than zero.'
         : undefined
-      : (validateRealStake(validStake ? stakeNumber : Number.NaN, realAvailable) ?? undefined)
+      : (validateRealStake(validStake ? stakeNumber : Number.NaN, realAvailable, {
+          min: realTrading.config?.stakeMin ?? REAL_STAKE_MIN,
+          max: realTrading.config?.stakeMax ?? REAL_STAKE_MAX,
+        }) ?? undefined)
     setStakeError(error)
     if (error) return
     setMessage(null)
@@ -323,7 +355,7 @@ export function TradeTicket({
         accountMode: kind,
         idempotencyKey: isDemo ? undefined : (orderKey ?? undefined),
       })
-      setMessage(result.message)
+      setMessage(isDemo && result.connected && result.data ? null : result.message)
       if (!isDemo && result.connected && result.data) {
         window.setTimeout(() => setOpen(false), 900)
       }
@@ -338,7 +370,9 @@ export function TradeTicket({
   function bumpStake(delta: number) {
     const current = validStake ? stakeNumber : 0
     const rounded = Math.round((current + delta) * 100) / 100
-    const next = isDemo ? Math.max(1, rounded) : Math.min(REAL_STAKE_MAX, Math.max(REAL_STAKE_MIN, rounded))
+    const stakeMin = realTrading.config?.stakeMin ?? REAL_STAKE_MIN
+    const stakeMax = realTrading.config?.stakeMax ?? REAL_STAKE_MAX
+    const next = isDemo ? Math.max(1, rounded) : Math.min(stakeMax, Math.max(stakeMin, rounded))
     setStake(String(next))
     setStakeError(undefined)
   }
@@ -415,6 +449,7 @@ export function TradeTicket({
         <AutoTradePanel
           kind={kind}
           prediction={loadedPrediction}
+          symbol={symbol}
           ticketReady={loadedActive}
           baseStake={validStake ? stakeNumber : Number.NaN}
           durationTicks={ticksNumber}
@@ -460,7 +495,9 @@ export function TradeTicket({
         <SectionLabel>Stake amount</SectionLabel>
         <div className="mb-1.5 grid grid-cols-6 gap-1">
           {STAKE_PRESETS.map((preset) => {
-            const blocked = !isDemo && preset > REAL_STAKE_MAX
+            const stakeMin = realTrading.config?.stakeMin ?? REAL_STAKE_MIN
+            const stakeMax = realTrading.config?.stakeMax ?? REAL_STAKE_MAX
+            const blocked = !isDemo && (preset < stakeMin || preset > stakeMax)
             return (
               <button
                 key={preset}
@@ -484,8 +521,8 @@ export function TradeTicket({
           label="Stake"
           value={stake}
           step={1}
-          min={isDemo ? 0.5 : REAL_STAKE_MIN}
-          max={isDemo ? undefined : REAL_STAKE_MAX}
+          min={isDemo ? 0.5 : (realTrading.config?.stakeMin ?? REAL_STAKE_MIN)}
+          max={isDemo ? undefined : (realTrading.config?.stakeMax ?? REAL_STAKE_MAX)}
           disabled={inputsLocked}
           onChange={(value) => {
             setStake(value)
@@ -602,7 +639,7 @@ export function TradeTicket({
           <ConfirmDialog
             open={riskOpen}
             title="Before your first REAL trade"
-            body={`REAL trades use your real balance. If a contract loses, the whole stake is lost. Payouts are not guaranteed and past results do not predict future outcomes. Only trade money you can afford to lose. Stakes are ${formatMoney(REAL_STAKE_MIN)} – ${formatMoney(REAL_STAKE_MAX)} per trade.`}
+            body={`REAL trades use your real balance. If a contract loses, the whole stake is lost. Payouts are not guaranteed and past results do not predict future outcomes. Only trade money you can afford to lose. Stakes are ${formatMoney(realTrading.config?.stakeMin ?? REAL_STAKE_MIN)} – ${formatMoney(realTrading.config?.stakeMax ?? REAL_STAKE_MAX)} per trade.`}
             confirmLabel="I understand"
             onClose={() => setRiskOpen(false)}
             onConfirm={() => {

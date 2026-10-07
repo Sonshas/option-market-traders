@@ -1,4 +1,5 @@
 import { lastDigitOfPrice } from '@/domain/contracts'
+import { settlementLossCount, settlementWinCount } from '@/domain/outcome'
 import { extractLastDigit } from '@/providers/market-data/deriv-digits'
 import type { Tick } from '@/types'
 
@@ -27,6 +28,9 @@ export type DigitStats = {
   lastDigit: number | null
   mostFrequent: number | null
   leastFrequent: number | null
+  /** Ticks that would settle won (exit digit 0–8) — same for every trade type. */
+  settlementWinCount: number
+  settlementLossCount: number
 }
 
 /** Digit of a genuine tick — provider digit first, then quote ÷ pip size, then string fallback. */
@@ -101,6 +105,8 @@ export function computeDigitStats(digits: number[], window = 100, barrier = 5): 
     lastDigit: sample.length > 0 ? sample[sample.length - 1]! : null,
     mostFrequent,
     leastFrequent,
+    settlementWinCount: settlementWinCount(sample),
+    settlementLossCount: settlementLossCount(sample),
   }
 }
 

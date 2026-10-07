@@ -17,7 +17,8 @@ export const REAL_INTEGRATION: RealCapabilityMap = {
   },
   executionConfigured: false,
   paymentConfigured: false,
-  depositsConfigured: true,
+  /** DEMO-only site: no new REAL deposits; withdrawals stay on so existing REAL balances can be paid out. */
+  depositsConfigured: false,
   withdrawalsConfigured: true,
   complianceConfigured: false,
 }

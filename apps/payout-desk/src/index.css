@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #0f1117;
+  --color-ink-2: #13161e;
+  --color-ink-3: #0b0d12;
+  --color-surface: #191c26;
+  --color-surface-2: #1c2030;
+  --color-surface-3: #252a3c;
+  --color-paper: #f5f7fb;
+  --color-mist: #9ca3af;
+  --color-line: #2a2f3d;
+  --color-line-strong: #3b4256;
+  --color-signal: #3b82f6;
+  --color-signal-strong: #2563eb;
+  --color-signal-hover: #1d4ed8;
+  --color-signal-soft: #93c5fd;
+  --color-signal-light: #60a5fa;
+  --color-call: #10b981;
+  --color-call-hover: #34d399;
+  --color-put: #f43f5e;
+  --color-warn: #fbbf24;
+  --color-danger: #f87171;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html {
+  background: var(--color-ink);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(900px 420px at 10% -10%, rgb(37 99 235 / 0.18), transparent 60%),
+    var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-signal-light);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

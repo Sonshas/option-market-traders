@@ -1,3 +1,5 @@
+import { reportBackendIssue } from '@/services/system-issues'
+
 const EMAIL_OTP_TYPES = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email'] as const
 
 export type EmailOtpTypeName = (typeof EMAIL_OTP_TYPES)[number]
@@ -166,8 +168,19 @@ export function plainAuthMessage(raw: string): string {
   if (lower.includes('auth session missing') || lower.includes('session missing')) {
     return 'This reset link is missing or has expired. Request a new one.'
   }
-  return text
+  if (/^password should (be|contain)/i.test(text)) return text
+  if (lower.includes('invalid format') || lower.includes('valid email')) return 'Enter a valid email address.'
+  if (lower.includes('signups not allowed') || lower.includes('signup is disabled')) {
+    return 'New sign-ups are paused right now. Please try again later.'
+  }
+  if (lower.includes('same password') || lower.includes('different from the old')) {
+    return 'Choose a password different from your current one.'
+  }
+  reportBackendIssue('auth', 'auth.unmapped_error', text)
+  return AUTH_FALLBACK
 }
+
+export const AUTH_FALLBACK = 'Something went wrong. Please try again in a moment.'
 
 let captured: ParsedAuthLink | null = null
 

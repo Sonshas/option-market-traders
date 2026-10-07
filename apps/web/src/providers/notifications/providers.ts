@@ -1,6 +1,7 @@
 import { DEMO_ACCOUNT_ID, DEMO_USER_ID } from '@/domain/account'
 import { createId, nowIso } from '@/lib/ids'
 import { loadDemoState, mutateDemoState } from '@/lib/demo-store'
+import { reportBackendIssue } from '@/services/system-issues'
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase'
 import { REAL_INTEGRATION } from '@/providers/config'
 import { okDemo, okReal, notConnected } from '@/providers/results'
@@ -68,7 +69,8 @@ export const realNotificationProvider: NotificationProvider = {
       .order('created_at', { ascending: false })
 
     if (error) {
-      return notConnected([], `REAL notifications read failed: ${error.message}`)
+      reportBackendIssue('notifications', 'notifications.read', error)
+      return notConnected([], `REAL notifications read failed. Please try again later.`)
     }
 
     const rows: Notification[] = (data ?? []).map((row) => ({
@@ -85,7 +87,7 @@ export const realNotificationProvider: NotificationProvider = {
       updatedAt: row.updated_at,
     }))
 
-    return okReal(rows, rows.length ? 'REAL notifications from Supabase.' : 'No REAL notifications yet.')
+    return okReal(rows, rows.length ? 'REAL notifications loaded.' : 'No REAL notifications yet.')
   },
 }
 
@@ -140,7 +142,8 @@ export const realSupportProvider: SupportProvider = {
       .order('created_at', { ascending: false })
 
     if (error) {
-      return notConnected([], `REAL support tickets read failed: ${error.message}`)
+      reportBackendIssue('support', 'support_tickets.read', error)
+      return notConnected([], `REAL support tickets read failed. Please try again later.`)
     }
 
     const rows: SupportTicket[] = (data ?? []).map((row) => ({
@@ -155,7 +158,7 @@ export const realSupportProvider: SupportProvider = {
       updatedAt: row.updated_at,
     }))
 
-    return okReal(rows, rows.length ? 'REAL support tickets from Supabase.' : 'No REAL support tickets yet.')
+    return okReal(rows, rows.length ? 'REAL support tickets loaded.' : 'No REAL support tickets yet.')
   },
 
   async createTicket(input) {
@@ -197,7 +200,8 @@ export const realSupportProvider: SupportProvider = {
       .single()
 
     if (error || !data) {
-      return notConnected(null, error?.message ?? 'Failed to create support ticket.', 'NOT_CONNECTED')
+      if (error) reportBackendIssue('support', 'support_tickets.create', error)
+      return notConnected(null, 'Your ticket could not be sent. Please try again later.', 'NOT_CONNECTED')
     }
 
     const ticket: SupportTicket = {
@@ -211,6 +215,6 @@ export const realSupportProvider: SupportProvider = {
       createdAt: data.created_at,
       updatedAt: data.updated_at,
     }
-    return okReal(ticket, 'REAL support ticket created in Supabase.')
+    return okReal(ticket, 'Support ticket created.')
   },
 }

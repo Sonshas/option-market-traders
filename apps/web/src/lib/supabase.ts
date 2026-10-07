@@ -34,9 +34,7 @@ export const supabase: SupabaseClient<Database> = new Proxy({} as SupabaseClient
   get(_target, prop, receiver) {
     const live = getSupabase()
     if (!live) {
-      throw new Error(
-        'Supabase is not configured. Copy apps/web/.env.example to apps/web/.env and set VITE_SUPABASE_URL + VITE_SUPABASE_PUBLISHABLE_KEY.',
-      )
+      throw new Error('This service is temporarily unavailable. Please try again later.')
     }
     return Reflect.get(live, prop, receiver)
   },

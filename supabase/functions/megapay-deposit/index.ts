@@ -16,8 +16,7 @@ import {
   initiateStk,
   json,
   publicDeposit,
-  realPaymentsEnabled,
-  serverConfig,
+  resolveServerConfig,
   userFromRequest,
   type DepositRow,
 } from '../_shared/server.ts'
@@ -28,12 +27,12 @@ const RATE_LIMIT_MAX_PENDING = 3
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const cfg = serverConfig()
   const admin = adminClient()
   const user = await userFromRequest(admin, req)
   if (!user) return json({ error: 'Sign in to deposit.' }, 401)
 
-  const enabled = await realPaymentsEnabled(admin)
+  const cfg = await resolveServerConfig(admin)
+  const enabled = false
   const configured = credentialsConfigured(cfg)
 
   if (req.method === 'GET') {
@@ -45,10 +44,12 @@ Deno.serve(async (req) => {
       kes_per_usd: cfg.kesPerUsd,
       min_kes: cfg.minKes,
       max_kes: cfg.maxKes,
+      quick_amounts: cfg.quickAmounts,
       message: enabled && configured ? null : UNAVAILABLE_MESSAGE,
     })
   }
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
+  if (!enabled) return json({ error: 'Deposits are closed. This site is DEMO practice only.' }, 403)
 
   if (!configured) return json({ error: UNAVAILABLE_MESSAGE }, 503)
   if (!enabled) return json({ error: 'Real deposits are not enabled yet.' }, 403)

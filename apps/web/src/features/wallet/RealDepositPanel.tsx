@@ -7,7 +7,7 @@ import { notifyRealWalletChanged } from '@/lib/real-wallet-events'
 import { authService } from '@/services/auth'
 import { depositMethodLabel, depositService, type DepositConfig, type DepositState } from '@/services/deposits'
 
-const QUICK_AMOUNTS = [1600, 2500, 5000, 10000]
+const DEFAULT_QUICK_AMOUNTS = [1600, 2500, 5000, 10000]
 const POLL_INTERVAL_MS = 3000
 const POLL_TIMEOUT_MS = 2 * 60 * 1000
 
@@ -33,7 +33,12 @@ export function RealDepositPanel({ onClose, className }: { onClose: () => void; 
       if (cancelled) return
       if (result.ok) {
         setConfig(result.data)
-        setAmount((current) => (Number(current) < result.data.minKes ? String(result.data.minKes) : current))
+        setAmount((current) => {
+          const n = Number(current)
+          if (!Number.isFinite(n) || n < result.data.minKes) return String(result.data.minKes)
+          if (n > result.data.maxKes) return String(result.data.maxKes)
+          return current
+        })
       } else setConfigError(result.error)
     })
     void authService.getProfileExtras().then((extras) => {
@@ -53,6 +58,9 @@ export function RealDepositPanel({ onClose, className }: { onClose: () => void; 
 
   const amountKes = Number(amount)
   const usdPreview = config && Number.isInteger(amountKes) && amountKes > 0 ? kesToUsd(amountKes, config.kesPerUsd) : null
+  const quickAmounts = (config?.quickAmounts?.length ? config.quickAmounts : DEFAULT_QUICK_AMOUNTS).filter(
+    (value) => !config || (value >= config.minKes && value <= config.maxKes),
+  )
 
   function poll(provider: DepositConfig['provider'], depositId: string, startedAt: number) {
     pollTimer.current = window.setTimeout(async () => {
@@ -150,7 +158,7 @@ export function RealDepositPanel({ onClose, className }: { onClose: () => void; 
             hint={`Min KES ${config.minKes.toLocaleString()} · Max KES ${config.maxKes.toLocaleString()}`}
           />
           <div className="flex flex-wrap gap-2">
-            {QUICK_AMOUNTS.map((value) => (
+            {quickAmounts.map((value) => (
               <Button
                 key={value}
                 type="button"

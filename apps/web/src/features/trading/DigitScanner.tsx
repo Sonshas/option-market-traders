@@ -1,47 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { digitsFromTicks } from '@/domain/digit-stats'
-import { AI_SCANNER_NOTE, bestScanPick } from '@/domain/digit-scanner'
-import { predictionLabel, scanResultFromPick, volatilityLabelOf } from '@/domain/prediction'
+import { predictionLabel, scanResultFromRandomPick, volatilityLabelOf } from '@/domain/prediction'
+import { randomDigitPick } from '@/domain/random-pick'
 import { usePrediction } from '@/hooks/usePrediction'
 import { createId } from '@/lib/ids'
 import { predictionStore } from '@/lib/prediction-store'
 import { isRealTradeSymbol } from '@/providers/trading/real-trading-provider'
 import { isVolatilityIndex, volatilityRank } from '@/domain/market-sections'
-import { getMarketDataProvider } from '@/services/market-data'
-import { getBufferedTicks, getLastReceivedAt } from '@/providers/market-data/tick-buffer'
 import type { AccountMode, ContractType, Market } from '@/types'
 
-/** Largest sample fetched once per volatility; smaller samples slice it client-side. */
-const FETCH_COUNT = 1000
-/** ticks_history requests in flight at once on the shared socket, and the pause between batches. */
-const BATCH_SIZE = 2
-const BATCH_GAP_MS = 350
-/** Wait before each ticks_history attempt for one symbol (first attempt immediate). */
-const RETRY_DELAYS_MS = [0, 1500, 3500]
-/** A volatility refreshed this recently (live stream or a previous scan) is not fetched again — Deriv rate limits ticks_history. */
-const FRESH_BUFFER_MS = 15_000
+const SCAN_STEP_MS = 60
 
 const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
 
+export const AI_SCANNER_RANDOM_NOTE = 'Random pick: EVEN/ODD, MATCH/DIFFER or OVER/UNDER on a random volatility.'
+
 /**
- * AI BOT SCANNER: ranks every volatility index by its strongest setup for the ticket's contract in recent genuine
- * Deriv ticks (counts only) and shows exactly one result. Each scan replaces the previous result and clears the
- * loaded prediction; LOAD PREDICTION stores the shown result as is and never places a trade.
+ * AI BOT SCANNER: picks ONE random digit contract (any of the six) on ONE random volatility. Each scan replaces the
+ * previous result and clears the loaded prediction. LOAD PREDICTION stores the shown result as-is and never places a trade.
  */
 export function DigitScanner({
   open,
   onClose,
   markets,
   kind,
-  contractType,
   onLoad,
 }: {
   open: boolean
   onClose: () => void
   markets: Market[]
   kind: AccountMode
-  /** Contract type selected on the ticket; the prediction is for this contract. */
-  contractType: ContractType
+  /** Contract type selected on the ticket; ignored — the pick is any of the six contracts. */
+  contractType?: ContractType
   onLoad: () => void
 }) {
   const { latest, scanning } = usePrediction()
@@ -70,40 +59,18 @@ export function DigitScanner({
     if (list.length === 0) return
     const run = ++runRef.current
     predictionStore.beginScan()
-    const provider = getMarketDataProvider(kind)
-    const found: Array<{ symbol: string; digits: number[] }> = []
     setProgress({ done: 0, total: list.length })
-    for (let i = 0; i < list.length; i += BATCH_SIZE) {
-      if (i > 0) await wait(BATCH_GAP_MS)
+    for (let i = 1; i <= list.length; i += 1) {
+      await wait(SCAN_STEP_MS)
       if (run !== runRef.current) return
-      await Promise.all(
-        list.slice(i, i + BATCH_SIZE).map(async (symbol) => {
-          let fresh =
-            getBufferedTicks(symbol).length >= FETCH_COUNT && Date.now() - getLastReceivedAt(symbol) < FRESH_BUFFER_MS
-          for (let attempt = 0; !fresh && attempt < RETRY_DELAYS_MS.length && provider.getTickHistory; attempt += 1) {
-            try {
-              if (attempt > 0) await wait(RETRY_DELAYS_MS[attempt]!)
-              if (run !== runRef.current) return
-              await provider.getTickHistory(symbol, FETCH_COUNT)
-              fresh = true
-            } catch {
-              // Deriv rate limits ticks_history; back off and retry
-            }
-          }
-          const digits = digitsFromTicks(getBufferedTicks(symbol)).slice(-FETCH_COUNT)
-          if (digits.length > 0) found.push({ symbol, digits })
-        }),
-      )
-      if (run !== runRef.current) return
-      setProgress({ done: Math.min(i + BATCH_SIZE, list.length), total: list.length })
+      setProgress({ done: i, total: list.length })
     }
-    const ordered = list.flatMap((symbol) => found.filter((item) => item.symbol === symbol))
-    const pick = bestScanPick(ordered, contractType)
+    const pick = randomDigitPick(list)
     predictionStore.completeScan(
-      pick ? scanResultFromPick(pick, volatilityLabelOf(pick.symbol, displayNameOf(pick.symbol)), Date.now(), createId('scan')) : null,
+      pick ? scanResultFromRandomPick(pick, volatilityLabelOf(pick.symbol, displayNameOf(pick.symbol)), Date.now(), createId('scan')) : null,
     )
     setProgress(null)
-  }, [symbolKey, kind, contractType, displayNameOf])
+  }, [symbolKey, displayNameOf])
 
   useEffect(() => {
     if (!open) {
@@ -165,7 +132,7 @@ export function DigitScanner({
             </div>
           ) : !result ? (
             <p className="py-6 text-center text-sm text-mist" data-testid="ai-scanner-empty">
-              No real ticks received yet. Try Rescan.
+              No pick yet. Try Rescan.
             </p>
           ) : (
             <section
@@ -189,6 +156,15 @@ export function DigitScanner({
                   {result.volatilityLabel}
                 </span>
               </p>
+              {(result.digit != null || result.barrier != null) && (
+                <p className="mt-1 flex items-baseline justify-between gap-3 text-sm">
+                  <span className="text-mist">Target:</span>
+                  <span className="font-mono font-semibold text-paper" data-testid="ai-scanner-target">
+                    {result.digit ?? result.barrier}
+                  </span>
+                </p>
+              )}
+              <p className="mt-2 text-center text-[11px] text-mist">Scanner result only — click LOAD PREDICTION to use it.</p>
             </section>
           )}
         </div>
@@ -216,7 +192,7 @@ export function DigitScanner({
         </div>
 
         <p className="mt-2 text-center text-[11px] text-mist" data-testid="scanner-disclaimer">
-          {AI_SCANNER_NOTE}
+          {AI_SCANNER_RANDOM_NOTE}
         </p>
       </div>
     </div>

@@ -1,5 +1,8 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { RequireAdmin, RequireSuperadmin } from '@/components/RequireAdmin'
 import { RequireAuth } from '@/components/RequireAuth'
+import { SimulatedSync } from '@/components/SimulatedSync'
+import { SuperAdminPanel } from '@/features/admin/SuperAdminPanel'
 import { TRADE_ROUTE } from '@/lib/auth-redirect'
 import { AuthProvider } from '@/hooks/useAuth'
 import { AccountModeProvider } from '@/hooks/useAccountMode'
@@ -19,10 +22,11 @@ import {
   AdminAuditPage,
   AdminCopyTradersPage,
   AdminDashboardPage,
+  AdminSystemPage,
   AdminDepositsPage,
+  AdminFeesPage,
   AdminLedgerPage,
   AdminNotificationsPage,
-  AdminOverviewPage,
   AdminSettingsPage,
   AdminSupportPage,
   AdminTradesPage,
@@ -53,6 +57,7 @@ function RedirectToTrade() {
 export default function App() {
   return (
     <AuthProvider>
+    <SimulatedSync />
     <AccountModeProvider>
       <Routes>
         <Route element={<PublicLayout />}>
@@ -102,13 +107,29 @@ export default function App() {
           <Route path="security" element={<SecurityPage />} />
         </Route>
 
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminOverviewPage />} />
+        <Route
+          path="/admin"
+          element={
+            <RequireAdmin>
+              <AdminLayout />
+            </RequireAdmin>
+          }
+        >
+          <Route
+            index
+            element={
+              <RequireSuperadmin>
+                <SuperAdminPanel />
+              </RequireSuperadmin>
+            }
+          />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="accounts" element={<AdminAccountsPage />} />
           <Route path="deposits" element={<AdminDepositsPage />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
+          <Route path="system" element={<AdminSystemPage />} />
           <Route path="withdrawals" element={<AdminWithdrawalsPage />} />
+          <Route path="fees" element={<AdminFeesPage />} />
           <Route path="trades" element={<AdminTradesPage />} />
           <Route path="ledger" element={<AdminLedgerPage />} />
           <Route path="support" element={<AdminSupportPage />} />
@@ -116,7 +137,14 @@ export default function App() {
           <Route path="bots" element={<Navigate to="/admin" replace />} />
           <Route path="copy-traders" element={<AdminCopyTradersPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
-          <Route path="audit" element={<AdminAuditPage />} />
+          <Route
+            path="audit"
+            element={
+              <RequireSuperadmin>
+                <AdminAuditPage />
+              </RequireSuperadmin>
+            }
+          />
         </Route>
 
         <Route path="/trade" element={<RedirectToTrade />} />

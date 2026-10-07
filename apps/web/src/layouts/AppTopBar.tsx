@@ -3,17 +3,18 @@ import { createPortal } from 'react-dom'
 import { Link, NavLink, matchPath, useLocation, useNavigate } from 'react-router-dom'
 import { Logo, Mark } from '@/components/brand/Logo'
 import { Icon, type NavIconName } from '@/components/icons'
+import { STAFF_ROLES } from '@/components/RequireStaff'
 import { useAccountMode } from '@/hooks/useAccountMode'
 import { useAuthSession } from '@/hooks/useAuth'
 import { useNotifications } from '@/hooks/useBots'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { usePracticeBook } from '@/hooks/usePracticeBook'
+import { PRACTICE_BOOK_LABEL, type PracticeBook } from '@/lib/practice-book'
 import { useWallet } from '@/hooks/useWallet'
 import { TRADE_ROUTE } from '@/lib/auth-redirect'
 import { cn } from '@/lib/cn'
 import { APP_DRAWER_NAV, APP_TOP_NAV, PROFILE_MENU_NAV } from '@/lib/constants'
 import { formatMoney } from '@/lib/format'
-
-const STAFF_ROLES = new Set(['admin', 'support', 'finance', 'compliance', 'superadmin'])
 
 function useDismiss(open: boolean, close: () => void, ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
@@ -43,10 +44,11 @@ function useAccountSummary() {
   const { user, isSignedIn, authService } = useAuthSession()
   const { items } = useNotifications()
   const isDemo = kind === 'demo'
+  const { book, isPractice, setBook } = usePracticeBook()
   const balance = isDemo ? formatMoney(wallet?.availableBalance ?? null) : balanceDisplay
   const name = user?.name?.trim() || user?.email?.split('@')[0] || 'Trader'
   const unread = items.filter((item) => !item.read).length
-  return { kind, setKind, isDemo, balance, user, isSignedIn, authService, name, unread }
+  return { kind, setKind, isDemo, balance, user, isSignedIn, authService, name, unread, book, isPractice, setBook }
 }
 
 type AccountSummary = ReturnType<typeof useAccountSummary>
@@ -57,35 +59,27 @@ function initials(name: string): string {
 }
 
 function ModeSwitch({ account, size }: { account: AccountSummary; size: 'sm' | 'touch' }) {
-  const { isDemo, setKind } = account
-  const button = size === 'touch' ? 'h-11 px-2.5 text-[11px] min-[400px]:px-3 min-[400px]:text-xs' : 'h-8 px-3 text-[11px]'
-  return (
-    <div
+  const pill = size === 'touch' ? 'h-9 px-2.5 text-[11px] min-[400px]:text-xs' : 'h-8 px-3 text-[11px]'
+  const option = (book: PracticeBook, label: string, title: string, activeClass: string) => (
+    <button
+      type="button"
       className={cn(
-        'flex shrink-0 rounded-full border',
-        size === 'sm' && 'p-0.5',
-        isDemo ? 'border-demo/40 bg-demo/10' : 'border-live/50 bg-live/10',
+        'flex items-center rounded-full font-bold uppercase tracking-wide',
+        pill,
+        account.book === book ? activeClass : 'text-mist hover:text-paper',
       )}
-      role="group"
-      aria-label="Account mode"
-      data-testid="mode-switch"
+      aria-pressed={account.book === book}
+      title={title}
+      onClick={() => account.setBook(book)}
+      data-testid={`mode-${book}`}
     >
-      <button
-        type="button"
-        className={cn('rounded-full font-bold uppercase tracking-wide', button, isDemo ? 'bg-demo text-ink' : 'text-mist')}
-        aria-pressed={isDemo}
-        onClick={() => setKind('demo')}
-      >
-        Demo
-      </button>
-      <button
-        type="button"
-        className={cn('rounded-full font-bold uppercase tracking-wide', button, !isDemo ? 'bg-live text-ink' : 'text-mist')}
-        aria-pressed={!isDemo}
-        onClick={() => setKind('real')}
-      >
-        Real
-      </button>
+      {label}
+    </button>
+  )
+  return (
+    <div className="flex shrink-0 items-center rounded-full border border-line bg-ink-2 p-0.5" data-testid="mode-switch">
+      {option('demo', 'Demo', 'DEMO account with virtual funds', 'bg-demo/15 text-demo')}
+      {option('practice', 'Practice', 'Real-style trading screen. Practice only: separate virtual balance, no real money', 'bg-amber/15 text-amber')}
     </div>
   )
 }
@@ -93,8 +87,8 @@ function ModeSwitch({ account, size }: { account: AccountSummary; size: 'sm' | '
 function BalanceBlock({ account }: { account: AccountSummary }) {
   return (
     <div className="shrink-0 whitespace-nowrap leading-tight" data-testid="topbar-balance">
-      <p className={cn('text-[9px] font-bold tracking-[0.14em]', account.isDemo ? 'text-demo' : 'text-live')}>
-        {account.isDemo ? 'DEMO ACCOUNT' : 'REAL ACCOUNT'}
+      <p className={cn('text-[9px] font-bold tracking-[0.14em]', account.isPractice ? 'text-amber' : 'text-demo')}>
+        {PRACTICE_BOOK_LABEL[account.book]}
       </p>
       <p className="font-mono text-xs font-semibold text-paper">{account.balance}</p>
     </div>
@@ -217,8 +211,8 @@ function ProfileMenu({ account, compact }: { account: AccountSummary; compact: b
             <p className="truncate text-sm font-semibold text-paper">{account.name}</p>
             {account.user?.email ? <p className="max-w-56 truncate text-[11px] text-mist">{account.user.email}</p> : null}
             {compact ? (
-              <p className={cn('mt-1 text-[10px] font-bold tracking-[0.14em]', account.isDemo ? 'text-demo' : 'text-live')}>
-                {account.isDemo ? 'DEMO ACCOUNT' : 'REAL ACCOUNT'}
+              <p className={cn('mt-1 text-[10px] font-bold tracking-[0.14em]', account.isPractice ? 'text-amber' : 'text-demo')}>
+                {PRACTICE_BOOK_LABEL[account.book]}
               </p>
             ) : null}
           </div>
@@ -457,7 +451,7 @@ export function AppTopBar() {
     <header
       className={cn(
         'sticky top-0 z-40 shrink-0 border-b bg-ink/90 backdrop-blur-md',
-        account.isDemo ? 'border-line' : 'border-live/50',
+        account.isPractice ? 'border-amber/50' : 'border-line',
       )}
       data-testid="app-topbar"
     >

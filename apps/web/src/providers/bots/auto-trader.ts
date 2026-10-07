@@ -1,16 +1,28 @@
 import {
+  DEFAULT_REAL_STAKE_BOUNDS,
   evaluateAutoStop,
   nextAutoStake,
+  pnlStopReason,
   resolveAutoStake,
   validateAutoSettings,
   type AutoAccount,
   type AutoTradeSettings,
+  type RealStakeBounds,
 } from '@/domain/auto-trade'
 import { botProgress, type BotProgress } from '@/domain/bot-strategies'
 import type { DigitContractKind } from '@/domain/digit-contracts'
-import { orderFromPrediction, validatePrediction, type LoadedPrediction } from '@/domain/prediction'
+import {
+  orderFromPrediction,
+  scanResultFromRandomPick,
+  validatePrediction,
+  volatilityLabelOf,
+  type LoadedPrediction,
+} from '@/domain/prediction'
+import { randomDigitPick } from '@/domain/random-pick'
+import { RESULT_MIN_MS, SETTLE_HOLD_MS } from '@/features/trading/trade-result-animation'
 import { settledResult, type SettledResult } from '@/domain/trade-result'
 import { getActiveAccountMode } from '@/lib/active-account-mode'
+import { reportBackendIssue } from '@/services/system-issues'
 import { createId, nowIso } from '@/lib/ids'
 import { predictionStore } from '@/lib/prediction-store'
 import { getLastReceivedAt, getLatestBufferedTick, getLiveTickSource } from '@/providers/market-data/tick-buffer'
@@ -26,7 +38,7 @@ import type { Trade } from '@/types'
 /**
  * Auto Trade engine (DEMO and REAL): one strategy loop, one trade at a time, each placed through the executor of
  * the selected account and continued only after that account reports the settled result. Every order copies the
- * prediction frozen at start; the engine never scans or picks a direction itself. Runs only in memory — a reload,
+ * prediction frozen at start; with none loaded, DEMO runs pick a random digit contract on the ticket's market themselves. Runs only in memory — a reload,
  * mode switch, sign-out, new scan or leaving the page ends it.
  */
 
@@ -51,8 +63,12 @@ export interface AutoTradeSession {
   status: 'running' | 'stopped'
   phase: AutoPhase
   settings: AutoTradeSettings
-  /** Frozen copy of the loaded prediction this run executes. */
+  /** Frozen REAL stake bounds from trading_settings at start (DEMO runs ignore this). */
+  realStakeBounds: RealStakeBounds
+  /** Frozen copy of the loaded prediction this run executes (a placeholder EVEN on the market when self-picking). */
   prediction: LoadedPrediction
+  /** DEMO only: no prediction loaded, so each order picks a random digit contract on the prediction's market. */
+  selfPick: boolean
   startedAt: string
   stoppedAt: string | null
   stopReason: string | null
@@ -85,6 +101,9 @@ export interface AutoTradeEngineDeps {
   /** Client time the last genuine tick for `symbol` arrived (0 if never). */
   lastTickAt: (symbol: string) => number
   newKey: () => string
+  random: () => number
+  /** Pause after each settled result before the next order. */
+  resultPauseMs: number
   pollMs: number
   retryMs: number
   /** Give up waiting for a fresh live price after this many retries. */
@@ -107,6 +126,19 @@ function lastSettled(trades: Trade[]): Trade | null {
   return latest
 }
 
+function selfPickPrediction(symbol: string, now: number): LoadedPrediction {
+  return {
+    id: createId('selfpick'),
+    contract: 'EVEN_ODD',
+    side: 'even',
+    symbol,
+    volatilityLabel: volatilityLabelOf(symbol),
+    scannedAt: now,
+    sampleSize: 0,
+    loadedAt: now,
+  }
+}
+
 function martingaleStake(session: AutoTradeSession): number {
   const last = lastSettled(session.trades)
   return nextAutoStake(
@@ -127,6 +159,8 @@ export function createAutoTradeEngine(overrides: Partial<AutoTradeEngineDeps> = 
     ensureFeed: (symbol) => getLiveTickSource()?.ensureSubscribed(symbol),
     lastTickAt: getLastReceivedAt,
     newKey: newIdempotencyKey,
+    random: Math.random,
+    resultPauseMs: SETTLE_HOLD_MS + RESULT_MIN_MS,
     pollMs: 1_000,
     retryMs: 1_000,
     maxRetries: 20,
@@ -183,7 +217,7 @@ export function createAutoTradeEngine(overrides: Partial<AutoTradeEngineDeps> = 
   /** Stop reason when the loaded prediction or the account mode no longer match this run, else null. */
   function runGuard(id: string): string | null {
     if (!session || session.id !== id) return 'Stopped'
-    if (deps.currentPrediction()?.id !== session.prediction.id) return PREDICTION_CHANGED_STOP
+    if (!session.selfPick && deps.currentPrediction()?.id !== session.prediction.id) return PREDICTION_CHANGED_STOP
     if (deps.currentMode() !== session.account) return `Switched to ${deps.currentMode()}`
     return null
   }
@@ -209,15 +243,24 @@ export function createAutoTradeEngine(overrides: Partial<AutoTradeEngineDeps> = 
       }
       const progress = botProgress(session!.trades)
       const stake = resolveAutoStake(martingaleStake(session!), balance, settings)
-      const reason = evaluateAutoStop(progress, stake, balance, settings)
+      const reason = evaluateAutoStop(progress, stake, balance, settings, session!.realStakeBounds)
       update(id, { balance })
       if (reason) {
         stop(reason)
         return
       }
 
-      // 3–4. The order is the frozen loaded prediction — never a new pick.
-      const pick = orderFromPrediction(current.prediction)
+      // 3–4. The order is the frozen loaded prediction, or a random digit contract when self-picking.
+      const pick = orderFromPrediction(
+        current.selfPick
+          ? scanResultFromRandomPick(
+              randomDigitPick([current.prediction.symbol], deps.random)!,
+              current.prediction.volatilityLabel,
+              deps.now(),
+              current.prediction.id,
+            )
+          : current.prediction,
+      )
       deps.ensureFeed(pick.symbol)
       update(id, {
         phase: 'picking',
@@ -284,6 +327,13 @@ export function createAutoTradeEngine(overrides: Partial<AutoTradeEngineDeps> = 
         lastResult: { prediction: pick.prediction, digit: settled.exitDigit ?? null, result },
         statusText: `${pick.prediction} → ${result}${settled.exitDigit != null ? ` on digit ${settled.exitDigit}` : ''}`,
       })
+      const limitReason = pnlStopReason(botProgress(session!.trades).realizedPnl, settings)
+      if (limitReason) {
+        stop(limitReason)
+        return
+      }
+      // Lets the digit cursor rest on the settled outcome before the next trade opens.
+      await deps.sleep(deps.resultPauseMs)
     }
   }
 
@@ -305,19 +355,27 @@ export function createAutoTradeEngine(overrides: Partial<AutoTradeEngineDeps> = 
     start(
       settings: AutoTradeSettings,
       mode: AutoAccount,
-      options: { realConfirmed?: boolean; prediction?: LoadedPrediction | null } = {},
+      options: {
+        realConfirmed?: boolean
+        prediction?: LoadedPrediction | null
+        /** DEMO only: market to self-pick EVEN / ODD on when no prediction is loaded. */
+        selfPickSymbol?: string | null
+        realStakeBounds?: RealStakeBounds
+      } = {},
     ): { ok: true; session: AutoTradeSession } | { ok: false; error: string } {
-      const prediction = options.prediction ?? null
+      const selfPick = !options.prediction && mode === 'DEMO' && Boolean(options.selfPickSymbol)
+      const prediction = selfPick ? selfPickPrediction(options.selfPickSymbol!, deps.now()) : (options.prediction ?? null)
       const predictionError = validatePrediction(prediction, mode)
       if (!prediction || predictionError) return { ok: false, error: predictionError! }
-      if (deps.currentPrediction()?.id !== prediction.id) return { ok: false, error: PREDICTION_CHANGED_STOP }
+      if (!selfPick && deps.currentPrediction()?.id !== prediction.id) return { ok: false, error: PREDICTION_CHANGED_STOP }
       if (deps.currentMode() !== mode) return { ok: false, error: `Blocked: ${deps.currentMode()} is selected, not ${mode}.` }
       if (settings.account !== mode) return { ok: false, error: `Blocked: settings are for ${settings.account} but ${mode} is selected.` }
       if (mode === 'REAL' && options.realConfirmed !== true) {
         return { ok: false, error: 'Confirm that Auto Trade will place real-money trades before starting.' }
       }
       if (session?.status === 'running') return { ok: false, error: 'Auto Trade is already running.' }
-      const invalid = validateAutoSettings(settings)
+      const realStakeBounds = options.realStakeBounds ?? DEFAULT_REAL_STAKE_BOUNDS
+      const invalid = validateAutoSettings(settings, realStakeBounds)
       if (invalid) return { ok: false, error: invalid }
       const id = createId('auto')
       session = {
@@ -326,7 +384,9 @@ export function createAutoTradeEngine(overrides: Partial<AutoTradeEngineDeps> = 
         status: 'running',
         phase: 'checking',
         settings: { ...settings },
+        realStakeBounds,
         prediction: Object.freeze({ ...prediction }),
+        selfPick,
         startedAt: nowIso(deps.now()),
         stoppedAt: null,
         stopReason: null,
@@ -339,7 +399,8 @@ export function createAutoTradeEngine(overrides: Partial<AutoTradeEngineDeps> = 
       emit()
       // A stop while a trade is open keeps polling that trade so the run still records its settled result.
       void loop(id).catch((error: unknown) => {
-        if (isRunning(id)) stop(error instanceof Error ? error.message : 'Auto Trade stopped unexpectedly')
+        reportBackendIssue('auto_trade', 'loop', error)
+        if (isRunning(id)) stop('Auto Trade stopped unexpectedly. Please try again.')
       })
       return { ok: true, session }
     },

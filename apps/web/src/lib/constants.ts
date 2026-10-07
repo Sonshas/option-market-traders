@@ -168,12 +168,14 @@ export const PROFILE_MENU_NAV = [
 export const STAKE_PRESETS = [1, 5, 10, 25, 50, 100] as const
 
 export const ADMIN_NAV = [
-  { to: '/admin', label: 'Overview', end: true },
+  { to: '/admin', label: 'Superadmin', end: true },
+  { to: '/admin/system', label: 'System health' },
   { to: '/admin/users', label: 'Users' },
   { to: '/admin/accounts', label: 'Accounts' },
   { to: '/admin/deposits', label: 'Deposits' },
   { to: '/admin/dashboard', label: 'Dashboard' },
   { to: '/admin/withdrawals', label: 'Withdrawals' },
+  { to: '/admin/fees', label: 'Fees' },
   { to: '/admin/trades', label: 'Trades' },
   { to: '/admin/ledger', label: 'Ledger' },
   { to: '/admin/support', label: 'Support' },

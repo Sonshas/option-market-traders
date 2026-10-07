@@ -1,4 +1,9 @@
-import { REAL_STAKE_MAX, validateRealStake } from '@/domain/digit-contracts'
+import { REAL_STAKE_MAX, REAL_STAKE_MIN, validateRealStake } from '@/domain/digit-contracts'
+
+/** Live REAL stake bounds from trading_settings (via real-trade GET). Defaults match digit-contracts. */
+export type RealStakeBounds = { min: number; max: number }
+
+export const DEFAULT_REAL_STAKE_BOUNDS: RealStakeBounds = { min: REAL_STAKE_MIN, max: REAL_STAKE_MAX }
 import type { BotProgress } from '@/domain/bot-strategies'
 import type { TradeStatus } from '@/types'
 
@@ -73,11 +78,14 @@ export function resolveAutoStake(
 }
 
 /** Settings problem that prevents starting, or null. */
-export function validateAutoSettings(settings: AutoTradeSettings): string | null {
+export function validateAutoSettings(
+  settings: AutoTradeSettings,
+  realBounds: RealStakeBounds = DEFAULT_REAL_STAKE_BOUNDS,
+): string | null {
   if (settings.account === 'REAL') {
-    const stakeError = validateRealStake(settings.baseStake)
+    const stakeError = validateRealStake(settings.baseStake, null, realBounds)
     if (stakeError) return stakeError
-    if (settings.maxStake > REAL_STAKE_MAX) return `Max stake for REAL is $${REAL_STAKE_MAX}.`
+    if (settings.maxStake > realBounds.max) return `Max stake for REAL is $${realBounds.max}.`
   } else if (!Number.isFinite(settings.baseStake) || settings.baseStake < AUTO_MIN_STAKE) {
     return `Base stake must be at least $${AUTO_MIN_STAKE.toFixed(2)}.`
   }
@@ -100,6 +108,16 @@ export function validateAutoSettings(settings: AutoTradeSettings): string | null
   return null
 }
 
+/** Target profit / stop loss reason once the run's settled P/L reaches either limit, else null. */
+export function pnlStopReason(
+  realizedPnl: number,
+  settings: Pick<AutoTradeSettings, 'targetProfit' | 'stopLoss'>,
+): string | null {
+  if (realizedPnl >= settings.targetProfit) return `Target profit reached (+$${realizedPnl.toFixed(2)})`
+  if (realizedPnl <= -settings.stopLoss) return `Stop loss reached (−$${Math.abs(realizedPnl).toFixed(2)})`
+  return null
+}
+
 /**
  * Reason the session must stop before the next trade, or null to continue. Evaluated only while no session
  * trade is open. The server still enforces REAL stake limits, the open-trade cap, the daily cap and balance.
@@ -110,14 +128,11 @@ export function evaluateAutoStop(
   availableBalance: number,
   settings: Pick<AutoTradeSettings, 'targetProfit' | 'stopLoss' | 'maxLossStreak' | 'maxStake'> &
     Partial<Pick<AutoTradeSettings, 'account' | 'maxTrades'>>,
+  realBounds: RealStakeBounds = DEFAULT_REAL_STAKE_BOUNDS,
 ): string | null {
   const account = settings.account ?? 'DEMO'
-  if (progress.realizedPnl >= settings.targetProfit) {
-    return `Target profit reached (+$${progress.realizedPnl.toFixed(2)})`
-  }
-  if (progress.realizedPnl <= -settings.stopLoss) {
-    return `Stop loss reached (−$${Math.abs(progress.realizedPnl).toFixed(2)})`
-  }
+  const pnlReason = pnlStopReason(progress.realizedPnl, settings)
+  if (pnlReason) return pnlReason
   if (progress.lossStreak >= settings.maxLossStreak) {
     return `${progress.lossStreak} losses in a row — safety stop`
   }
@@ -127,8 +142,8 @@ export function evaluateAutoStop(
   if (nextStake > settings.maxStake) {
     return `Next stake $${nextStake.toFixed(2)} is above the max stake $${settings.maxStake.toFixed(2)}`
   }
-  if (account === 'REAL' && nextStake > REAL_STAKE_MAX) {
-    return `Next stake $${nextStake.toFixed(2)} is above the REAL limit of $${REAL_STAKE_MAX}`
+  if (account === 'REAL' && nextStake > realBounds.max) {
+    return `Next stake $${nextStake.toFixed(2)} is above the REAL limit of $${realBounds.max}`
   }
   if (nextStake > availableBalance) {
     return `Balance too low for the next $${nextStake.toFixed(2)} stake`

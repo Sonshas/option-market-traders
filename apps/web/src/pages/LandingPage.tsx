@@ -124,10 +124,6 @@ function formatTickPrice(tick: Tick | undefined): string {
   return tick.price.toFixed(pipDecimals(tick.pipSize) ?? 2)
 }
 
-function shortName(market: Market): string {
-  return market.displayName.replace('Volatility', 'Vol')
-}
-
 export function LandingPage() {
   const { markets, ticks, status, settled } = useLiveTicker(8, 120)
   const featured = markets[0]
@@ -136,7 +132,6 @@ export function LandingPage() {
   return (
     <main>
       <Hero />
-      <LiveTicker markets={markets.slice(0, 8)} ticks={ticks} status={status} settled={settled} />
 
       <MediaFeature
         id="experience"
@@ -410,68 +405,6 @@ function Hero() {
           ))}
         </ul>
       </div>
-    </section>
-  )
-}
-
-function LiveTicker({
-  markets,
-  ticks,
-  status,
-  settled,
-}: {
-  markets: Market[]
-  ticks: Record<string, Tick[]>
-  status: ConnectionStatus
-  settled: boolean
-}) {
-  const items = markets.filter((m) => (ticks[m.symbol]?.length ?? 0) > 0)
-  return (
-    <section id="markets" aria-label="Live market ticker" className="border-y border-line bg-ink-2/80">
-      {items.length === 0 ? (
-        <p className="px-4 py-3.5 text-center text-xs text-mist">
-          {settled && markets.length === 0
-            ? 'Live market data is unavailable right now. Prices are never shown unless they are genuine.'
-            : status === 'error'
-              ? 'Live market data is unavailable right now.'
-              : 'Connecting to live Deriv market data…'}
-        </p>
-      ) : (
-        <div className="sbb-fade-x overflow-hidden">
-          <div className="sbb-marquee py-3">
-            {[0, 1].map((copy) => (
-              <ul key={copy} className="flex shrink-0" aria-hidden={copy === 1 || undefined}>
-                {items.map((market) => {
-                  const series = ticks[market.symbol]!
-                  const last = series[series.length - 1]
-                  const change = changePctOf(series)
-                  const digit = last ? digitOfTick(last) : null
-                  return (
-                    <li key={market.symbol} className="flex items-center gap-2.5 border-r border-line px-5 text-sm">
-                      <span className="sbb-gradient flex h-6 w-6 items-center justify-center rounded-md font-mono text-[10px] font-bold text-white">
-                        {digit ?? '–'}
-                      </span>
-                      <span className="whitespace-nowrap font-semibold text-paper">{shortName(market)}</span>
-                      <span className="font-mono text-mist">{formatTickPrice(last)}</span>
-                      {change != null ? (
-                        <span className={cn('font-mono text-xs font-semibold', change >= 0 ? 'text-call' : 'text-put')}>
-                          {change >= 0 ? '+' : ''}
-                          {change.toFixed(3)}%
-                        </span>
-                      ) : null}
-                    </li>
-                  )
-                })}
-              </ul>
-            ))}
-          </div>
-        </div>
-      )}
-      {items.length > 0 ? (
-        <p className="sr-only">
-          Live prices from the Deriv public tick stream. Change is measured across the most recent ticks received.
-        </p>
-      ) : null}
     </section>
   )
 }

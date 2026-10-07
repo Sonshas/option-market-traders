@@ -31,10 +31,10 @@ export function TermsPage() {
 export function PrivacyPage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-12">
-      <PageHeader title="Privacy" subtitle="This UI phase does not collect production account data." />
+      <PageHeader title="Privacy" />
       <p className="text-sm text-mist">
-        Auth forms are local. Submissions are not sent to Supabase or any payment processor. Do not enter real secrets
-        expecting them to be stored remotely. A production privacy policy will replace this notice when Auth is connected.
+        We store your account details, balances, and trade history to operate your account. Payment details are handled
+        by our payment partners. Never share your password with anyone, including support staff.
       </p>
     </main>
   )
