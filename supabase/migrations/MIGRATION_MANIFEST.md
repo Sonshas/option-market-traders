@@ -179,6 +179,13 @@ Verification: each key object was searched in the consolidated SQL (grep). ✅ =
 
 ## `20261007150000_superadmin_panel.sql`
 
+> **Not applied on production.** Unlike the sections above, this file was never run against the live
+> project (`wkfyavcjjuyzvyeprklz`). Production instead has the adapted
+> `20261014120000_superadmin_panel.sql` from `Sonshas/smartbase` (`app_admins`, `simulated_balances`,
+> `simulation_settings`, `simulated_win_rate_overrides`, `simulation_signals`, audit in `audit_log`); it has
+> no `admin_audit_log`, `simulated_open_stakes`, `simulated_balance_ledger` or `sync_superadmin_app_role`
+> trigger. Do not apply this section to production on top of it.
+
 | Object | In consolidated |
 | --- | --- |
 | Table `app_admins` (seed `sonshasopunga@gmail.com` as `superadmin`) | ✅ |
