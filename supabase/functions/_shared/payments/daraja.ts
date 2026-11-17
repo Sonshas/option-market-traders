@@ -4,7 +4,7 @@
 
 export const DARAJA_PROVIDER = 'daraja'
 export type DepositProvider = 'daraja' | 'megapay'
-export const DEFAULT_DEPOSIT_PROVIDER: DepositProvider = 'daraja'
+export const DEFAULT_DEPOSIT_PROVIDER: DepositProvider = 'megapay'
 export const DEFAULT_DARAJA_CALLBACK_URL = 'https://optionmarkettraders.com/api/mpesa/callback'
 export const DARAJA_PRODUCTION_BASE = 'https://api.safaricom.co.ke'
 export const DARAJA_SANDBOX_BASE = 'https://sandbox.safaricom.co.ke'
@@ -29,7 +29,7 @@ export type DarajaOutcome = 'completed' | 'cancelled' | 'failed' | 'pending'
 
 export function parseDepositProvider(raw: string | undefined | null): DepositProvider {
   const v = String(raw ?? '').trim().toLowerCase()
-  return v === 'megapay' ? 'megapay' : DEFAULT_DEPOSIT_PROVIDER
+  return v === 'daraja' ? 'daraja' : DEFAULT_DEPOSIT_PROVIDER
 }
 
 export function darajaBaseUrl(env: string | undefined | null): string {

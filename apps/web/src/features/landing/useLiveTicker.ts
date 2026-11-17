@@ -19,6 +19,8 @@ export function useLiveTicker(limit = 8, historyCount = 120) {
     const cleanups: Array<() => void> = []
     const pending: Record<string, Tick[]> = {}
     let timer: number | null = null
+    let startTimer: number | null = null
+    let idleHandle: number | null = null
 
     const flush = () => {
       timer = null
@@ -32,38 +34,53 @@ export function useLiveTicker(limit = 8, historyCount = 120) {
       if (timer == null) timer = window.setTimeout(flush, delay)
     }
 
-    const unsubStatus = provider.onConnectionStatus?.((next) => {
-      if (!cancelled) setStatus(next)
-    })
+    const start = () => {
+      if (cancelled) return
+      const unsubStatus = provider.onConnectionStatus?.((next) => {
+        if (!cancelled) setStatus(next)
+      })
+      if (unsubStatus) cleanups.push(unsubStatus)
 
-    provider
-      .listMarkets()
-      .then((list) => {
-        if (cancelled) return
-        const real = list.filter((m) => !m.isSimulated)
-        setMarkets(real)
-        setSettled(true)
-        for (const market of real.slice(0, limit)) {
-          const { symbol } = market
-          cleanups.push(subscribeTickBuffer(symbol, (next) => queue(symbol, next, 600)))
-          cleanups.push(provider.subscribeTicks(symbol, () => undefined))
-          provider
-            .getTickHistory?.(symbol, historyCount)
-            .then(() => {
-              if (!cancelled) queue(symbol, getBufferedTicks(symbol), 0)
-            })
-            .catch(() => undefined)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setSettled(true)
-      })
+      provider
+        .listMarkets()
+        .then((list) => {
+          if (cancelled) return
+          const real = list.filter((m) => !m.isSimulated)
+          setMarkets(real)
+          setSettled(true)
+          for (const market of real.slice(0, limit)) {
+            const { symbol } = market
+            cleanups.push(subscribeTickBuffer(symbol, (next) => queue(symbol, next, 600)))
+            cleanups.push(provider.subscribeTicks(symbol, () => undefined))
+            provider
+              .getTickHistory?.(symbol, historyCount)
+              .then(() => {
+                if (!cancelled) queue(symbol, getBufferedTicks(symbol), 0)
+              })
+              .catch(() => undefined)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setSettled(true)
+        })
+    }
+
+    // Let the landing HTML/CSS/JS paint before opening Deriv sockets + history fan-out.
+    const ric = window.requestIdleCallback
+    if (typeof ric === 'function') {
+      idleHandle = ric(() => start(), { timeout: 1500 })
+    } else {
+      startTimer = window.setTimeout(start, 400)
+    }
 
     return () => {
       cancelled = true
       if (timer != null) window.clearTimeout(timer)
+      if (startTimer != null) window.clearTimeout(startTimer)
+      if (idleHandle != null && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleHandle)
+      }
       for (const cleanup of cleanups) cleanup()
-      unsubStatus?.()
     }
   }, [limit, historyCount])
 

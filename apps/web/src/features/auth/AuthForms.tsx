@@ -32,6 +32,12 @@ export function LoginForm() {
   const [message, setMessage] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
 
+  useEffect(() => {
+    // Warm the post-login trade desk while the user types credentials.
+    void import('@/pages/trading/TradingPage')
+    void import('lightweight-charts')
+  }, [])
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault()
     const next: Record<string, string> = {}

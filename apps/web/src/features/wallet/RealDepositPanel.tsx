@@ -132,7 +132,12 @@ export function RealDepositPanel({ onClose, className }: { onClose: () => void; 
         <h2 className="font-display font-semibold">Deposit with M-Pesa</h2>
         <Badge tone="live">REAL</Badge>
       </div>
-      {config?.enabled ? <p className="mt-1 text-xs text-mist">{depositMethodLabel(config)}</p> : null}
+      {config?.enabled ? (
+        <p className="mt-1 text-xs text-mist">
+          {depositMethodLabel(config)}
+          {config.accountName ? ` · ${config.accountName}` : ''}
+        </p>
+      ) : null}
 
       {configError ? (
         <Alert tone="warn" className="mt-3">

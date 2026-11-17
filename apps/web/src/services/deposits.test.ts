@@ -18,17 +18,24 @@ vi.mock('@/lib/supabase', () => ({
 
 const { depositMethodLabel, depositService, resolveDepositProvider } = await import('@/services/deposits')
 
-const darajaConfig = {
-  provider: 'daraja',
+const megapayConfig = {
   enabled: true,
-  paybill: '4088285',
   kes_per_usd: 130,
   min_kes: 1600,
   max_kes: 150000,
+  till: '5619444',
+  account_name: 'option market traders phone mart',
   message: null,
 }
-const megapayConfig = { enabled: true, kes_per_usd: 130, min_kes: 1600, max_kes: 150000, message: null }
-const pending = { deposit_id: 'd1', reference: 'OMT-ABCD2345', status: 'PENDING', amount_usd: 12.31, amount_kes: 1600, receipt: null, failure_reason: null }
+const pending = {
+  deposit_id: 'd1',
+  reference: 'OMT-ABCD2345',
+  status: 'PENDING',
+  amount_usd: 12.31,
+  amount_kes: 1600,
+  receipt: null,
+  failure_reason: null,
+}
 
 beforeEach(() => {
   calls.length = 0
@@ -36,55 +43,51 @@ beforeEach(() => {
 })
 
 describe('resolveDepositProvider', () => {
-  it('defaults to daraja and honours megapay', () => {
-    expect(resolveDepositProvider({ provider: 'daraja' })).toBe('daraja')
+  it('defaults to megapay and only honours daraja when named', () => {
     expect(resolveDepositProvider({ provider: 'megapay' })).toBe('megapay')
-    expect(resolveDepositProvider({})).toBe('daraja')
-    expect(resolveDepositProvider(null)).toBe('daraja')
+    expect(resolveDepositProvider({ provider: 'daraja' })).toBe('daraja')
+    expect(resolveDepositProvider({})).toBe('megapay')
+    expect(resolveDepositProvider(null)).toBe('megapay')
   })
 
-  it('labels the Paybill for Daraja', () => {
-    expect(depositMethodLabel({ provider: 'daraja', paybill: '4088285' })).toBe('M-Pesa (Paybill 4088285)')
-    expect(depositMethodLabel({ provider: 'megapay', paybill: null })).toBe('M-Pesa')
+  it('labels Till for MegaPay and Paybill for Daraja', () => {
+    expect(depositMethodLabel({ provider: 'megapay', till: '5619444', paybill: null })).toBe('M-Pesa (Till 5619444)')
+    expect(depositMethodLabel({ provider: 'daraja', till: null, paybill: '4088285' })).toBe('M-Pesa (Paybill 4088285)')
+    expect(depositMethodLabel({ provider: 'megapay', till: null, paybill: null })).toBe('M-Pesa')
   })
 })
 
 describe('depositService provider selection', () => {
-  it('uses the Daraja functions when DEPOSIT_PROVIDER=daraja', async () => {
-    responses.set('GET mpesa-deposit', darajaConfig)
-    responses.set('POST mpesa-deposit', pending)
-    responses.set('POST mpesa-status', { ...pending, status: 'COMPLETED', receipt: 'NLJ7RT61SV' })
+  it('uses MegaPay functions for config, start and status', async () => {
+    responses.set('GET megapay-deposit', megapayConfig)
+    responses.set('POST megapay-deposit', pending)
+    responses.set('POST megapay-status', { ...pending, status: 'COMPLETED', receipt: 'NLJ7RT61SV' })
 
     const config = await depositService.getConfig()
     expect(config).toEqual({
       ok: true,
-      data: { provider: 'daraja', paybill: '4088285', enabled: true, kesPerUsd: 130, minKes: 1600, maxKes: 150000, message: null },
+      data: {
+        provider: 'megapay',
+        till: '5619444',
+        paybill: null,
+        enabled: true,
+        kesPerUsd: 130,
+        minKes: 1600,
+        maxKes: 150000,
+        accountName: 'option market traders phone mart',
+        message: null,
+      },
     })
-    const started = await depositService.startDeposit('daraja', 1600, '254712345678')
+    const started = await depositService.startDeposit('megapay', 1600, '254712345678')
     expect(started.ok && started.data.status).toBe('PENDING')
-    const status = await depositService.checkStatus('daraja', 'd1')
+    const status = await depositService.checkStatus('megapay', 'd1')
     expect(status.ok && status.data.receipt).toBe('NLJ7RT61SV')
-    expect(calls.map((c) => `${c.method} ${c.name}`)).toEqual(['GET mpesa-deposit', 'POST mpesa-deposit', 'POST mpesa-status'])
-    expect(calls[1]!.body).toEqual({ amount_kes: 1600, phone: '254712345678' })
-  })
-
-  it('falls back to the MegaPay functions when DEPOSIT_PROVIDER=megapay', async () => {
-    responses.set('GET mpesa-deposit', { provider: 'megapay' })
-    responses.set('GET megapay-deposit', megapayConfig)
-    responses.set('POST megapay-deposit', pending)
-    responses.set('POST megapay-status', pending)
-
-    const config = await depositService.getConfig()
-    expect(config.ok && config.data.provider).toBe('megapay')
-    expect(config.ok && config.data.minKes).toBe(1600)
-    await depositService.startDeposit('megapay', 1600, '254712345678')
-    await depositService.checkStatus('megapay', 'd1')
     expect(calls.map((c) => `${c.method} ${c.name}`)).toEqual([
-      'GET mpesa-deposit',
       'GET megapay-deposit',
       'POST megapay-deposit',
       'POST megapay-status',
     ])
+    expect(calls[1]!.body).toEqual({ amount_kes: 1600, phone: '254712345678' })
   })
 
   it('reports an error when the deposit config is unavailable', async () => {

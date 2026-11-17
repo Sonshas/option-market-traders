@@ -9,7 +9,8 @@ import {
 import { depositFeesFromMap, mergeMegapayConfig, parseQuickAmounts, type SettingsMap } from './payments/payment-settings.ts'
 
 const MEGAPAY_BASE = 'https://megapay.co.ke/backend/v1'
-export const DEFAULT_VAST_WEBHOOK_URL = 'https://vastderiv-traders.com/api/megapay/webhook'
+/** Partner MegaPay webhook: non-OMT events are forwarded here (one MegaPay webhook URL per account). */
+export const DEFAULT_VAST_WEBHOOK_URL = 'https://binaryderivpilot.com/api/megapay/webhook'
 export const UNAVAILABLE_MESSAGE = 'Deposits temporarily unavailable'
 
 export const corsHeaders = {
@@ -28,6 +29,9 @@ export function json(body: unknown, status = 200): Response {
 export interface ServerConfig extends MegapayConfig {
   apiKey: string | null
   email: string | null
+  /** Buy-goods till shown in the deposit UI (funds land on the MegaPay-linked till). */
+  till: string | null
+  accountName: string | null
   vastWebhookUrl: string
 }
 
@@ -37,6 +41,8 @@ export function serverConfig(): ServerConfig {
     ...parseMegapayConfig(env),
     apiKey: env.MEGAPAY_API_KEY?.trim() || null,
     email: env.MEGAPAY_EMAIL?.trim() || null,
+    till: env.MEGAPAY_TILL?.trim() || null,
+    accountName: env.MEGAPAY_ACCOUNT_NAME?.trim() || null,
     vastWebhookUrl: env.VAST_WEBHOOK_URL?.trim() || DEFAULT_VAST_WEBHOOK_URL,
   }
 }
@@ -63,7 +69,9 @@ export async function resolveServerConfig(admin: SupabaseClient): Promise<Server
   const map = await loadPaymentSettingsMap(admin)
   const money = mergeMegapayConfig(base, map)
   const deposit = depositFeesFromMap(map, base)
-  return { ...base, ...money, quickAmounts: parseQuickAmounts(deposit.quickAmounts) }
+  const till = (map.MEGAPAY_TILL?.trim() || base.till) || null
+  const accountName = (map.MEGAPAY_ACCOUNT_NAME?.trim() || base.accountName) || null
+  return { ...base, ...money, till, accountName, quickAmounts: parseQuickAmounts(deposit.quickAmounts) }
 }
 
 export function credentialsConfigured(cfg: ServerConfig): boolean {

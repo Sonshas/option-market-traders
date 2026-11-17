@@ -17,8 +17,8 @@ export const REAL_INTEGRATION: RealCapabilityMap = {
   },
   executionConfigured: false,
   paymentConfigured: false,
-  /** DEMO-only site: no new REAL deposits; withdrawals stay on so existing REAL balances can be paid out. */
-  depositsConfigured: false,
+  /** REAL M-Pesa deposits via MegaPay (server gated by REAL_PAYMENTS_ENABLED + secrets). */
+  depositsConfigured: true,
   withdrawalsConfigured: true,
   complianceConfigured: false,
 }

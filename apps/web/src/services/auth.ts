@@ -262,7 +262,11 @@ export const authService = {
     if (error) {
       return notConnected(null, plainAuthMessage(error.message), 'VALIDATION', 'real')
     }
-    const user = await resolveSessionUser(data.session)
+    // Return immediately from the Auth user — profile hydrate continues via onAuthStateChange.
+    // Waiting on the users-table round-trip here made "Log in" feel stuck.
+    const authUser = data.session?.user
+    const user = authUser ? userFromAuthOnly(authUser) : null
+    if (authUser) void hydrateUser(authUser)
     return okReal(user, `Signed in as ${user?.email ?? input.email}.`)
   },
 
@@ -523,7 +527,13 @@ export const authService = {
       return () => undefined
     }
     const { data } = client.auth.onAuthStateChange((_event, session) => {
-      void resolveSessionUser(session).then(callback)
+      if (!session?.user) {
+        callback(null)
+        return
+      }
+      // Emit a fast auth-only user so RequireAuth / post-login navigation never wait on hydrate.
+      callback(userFromAuthOnly(session.user))
+      void hydrateUser(session.user).then(callback)
     })
     return () => data.subscription.unsubscribe()
   },

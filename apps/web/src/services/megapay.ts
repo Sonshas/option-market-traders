@@ -8,6 +8,10 @@ export interface MegapayDepositConfig {
   minKes: number
   maxKes: number
   quickAmounts?: number[]
+  /** Public Till number shown in the deposit panel (not a secret). */
+  till?: string | null
+  /** Public MegaPay business name shown in the deposit panel (not a secret). */
+  accountName?: string | null
   message: string | null
 }
 
@@ -58,6 +62,9 @@ export const megapayService = {
         minKes: Number(data.min_kes),
         maxKes: Number(data.max_kes),
         quickAmounts: quick && quick.length ? quick : undefined,
+        till: typeof data.till === 'string' && data.till.trim() ? data.till.trim() : null,
+        accountName:
+          typeof data.account_name === 'string' && data.account_name.trim() ? data.account_name.trim() : null,
         message: (data.message as string | null) ?? null,
       },
     }

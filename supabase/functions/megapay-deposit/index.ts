@@ -16,6 +16,7 @@ import {
   initiateStk,
   json,
   publicDeposit,
+  realPaymentsEnabled,
   resolveServerConfig,
   userFromRequest,
   type DepositRow,
@@ -32,7 +33,7 @@ Deno.serve(async (req) => {
   if (!user) return json({ error: 'Sign in to deposit.' }, 401)
 
   const cfg = await resolveServerConfig(admin)
-  const enabled = false
+  const enabled = await realPaymentsEnabled(admin)
   const configured = credentialsConfigured(cfg)
 
   if (req.method === 'GET') {
@@ -41,6 +42,8 @@ Deno.serve(async (req) => {
       provider: MEGAPAY_PROVIDER,
       method: 'mpesa',
       currency: 'USD',
+      till: cfg.till,
+      account_name: cfg.accountName,
       kes_per_usd: cfg.kesPerUsd,
       min_kes: cfg.minKes,
       max_kes: cfg.maxKes,
@@ -49,10 +52,8 @@ Deno.serve(async (req) => {
     })
   }
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
-  if (!enabled) return json({ error: 'Deposits are closed. This site is DEMO practice only.' }, 403)
-
-  if (!configured) return json({ error: UNAVAILABLE_MESSAGE }, 503)
   if (!enabled) return json({ error: 'Real deposits are not enabled yet.' }, 403)
+  if (!configured) return json({ error: UNAVAILABLE_MESSAGE }, 503)
 
   let body: Record<string, unknown>
   try {

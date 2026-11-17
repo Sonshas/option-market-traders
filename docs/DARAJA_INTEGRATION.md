@@ -1,7 +1,10 @@
-# Safaricom Daraja (M-Pesa Express / STK Push) deposits
+# Safaricom Daraja (M-Pesa Express / STK Push) deposits — RETIRED
 
-REAL deposits go straight to our own M-Pesa **Paybill 4088285** through Safaricom Daraja
-(Lipa na M-Pesa Online / STK Push). MegaPay stays deployed as a fallback (see "Switching provider").
+**Status (2026-11-07):** REAL deposits use **MegaPay** only (Till `5619444`). See
+[MEGAPAY_INTEGRATION.md](MEGAPAY_INTEGRATION.md). The `mpesa-deposit` Edge Function still
+exists but only returns `{ provider: "megapay" }` on GET and `409` on POST.
+
+Historical notes below describe the retired Paybill flow (Paybill 4088285). MegaPay is the live channel.
 
 ## Flow
 

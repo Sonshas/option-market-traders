@@ -251,11 +251,11 @@ describe('decideDarajaSettlement', () => {
 
 describe('provider + query pacing', () => {
   it('defaults DEPOSIT_PROVIDER to daraja', () => {
-    expect(parseDepositProvider(undefined)).toBe('daraja')
-    expect(parseDepositProvider('')).toBe('daraja')
+    expect(parseDepositProvider(undefined)).toBe('megapay')
+    expect(parseDepositProvider('')).toBe('megapay')
     expect(parseDepositProvider('DARAJA')).toBe('daraja')
     expect(parseDepositProvider(' MegaPay ')).toBe('megapay')
-    expect(parseDepositProvider('other')).toBe('daraja')
+    expect(parseDepositProvider('other')).toBe('megapay')
   })
 
   it('queries after 30 s (or right after a callback) and at most every 10 s', () => {

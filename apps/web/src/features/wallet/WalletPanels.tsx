@@ -6,13 +6,14 @@ import { useAccountMode } from '@/hooks/useAccountMode'
 import { useAuthSession } from '@/hooks/useAuth'
 import { usePracticeBook } from '@/hooks/usePracticeBook'
 import { useWallet, useWalletHistory, useWallets } from '@/hooks/useWallet'
-import { REAL_BALANCE_PLACEHOLDER, accountModeLabel, realWithdrawalsEnabled } from '@/domain/account'
+import { REAL_BALANCE_PLACEHOLDER, accountModeLabel, realDepositsEnabled, realWithdrawalsEnabled } from '@/domain/account'
 import { localPhoneDisplay, withdrawalStatusLabel } from '@/domain/withdrawals'
 import { formatMoney } from '@/lib/format'
 import { REAL_INTEGRATION } from '@/providers/config'
 import { paymentProvider } from '@/services/payment'
 import { AccountHistoryCharts } from '@/features/wallet/AccountHistoryCharts'
 import { PayoutWithdrawPanel } from '@/features/payout-desk/PayoutWithdrawPanel'
+import { RealDepositPanel } from '@/features/wallet/RealDepositPanel'
 
 export function WalletPanels() {
   const { kind } = useAccountMode()
@@ -30,16 +31,19 @@ export function WalletPanels() {
   const isDemo = kind === 'demo'
   const { isPractice } = usePracticeBook()
   const realWithdrawalsOn = realWithdrawalsEnabled(REAL_INTEGRATION)
+  const realDepositsOn = realDepositsEnabled(REAL_INTEGRATION)
   const [params, setParams] = useSearchParams()
   const action = params.get('action')
 
   useEffect(() => {
     if (action !== 'deposit' && action !== 'withdraw') return
-    if (isPractice && action === 'withdraw') {
+    if (action === 'withdraw') {
       openRealWithdraw()
     } else if (isPractice) {
       setResult(null)
       setFormError(undefined)
+      setDialog('deposit')
+    } else if (!isDemo && realDepositsOn && isSignedIn) {
       setDialog('deposit')
     }
     const copy = new URLSearchParams(params)
@@ -49,14 +53,21 @@ export function WalletPanels() {
   }, [action])
 
   useEffect(() => {
-    if (!isPractice) setDialog(null)
-  }, [isPractice])
+    if (isPractice) return
+    if (isDemo) setDialog(null)
+  }, [isPractice, isDemo])
 
   /** DEMO funds cannot be withdrawn; Withdraw pays out a remaining REAL balance. */
   function openRealWithdraw() {
     setResult(null)
     setFormError(undefined)
     setDialog(realWithdrawalsOn && isSignedIn ? 'withdraw' : null)
+  }
+
+  function openRealDeposit() {
+    setResult(null)
+    setFormError(undefined)
+    setDialog(realDepositsOn && isSignedIn ? 'deposit' : null)
   }
 
   async function submit() {
@@ -171,7 +182,7 @@ export function WalletPanels() {
             <Stat
               label="Remaining Real Balance"
               value={realBalanceDisplay ?? REAL_BALANCE_PLACEHOLDER}
-              hint="Withdraw only · REAL trading has ended"
+              hint={isDemo || isPractice ? 'Withdraw only · REAL trading has ended' : undefined}
               tone="live"
             />
           </>
@@ -204,7 +215,31 @@ export function WalletPanels() {
           </Button>
         </div>
       ) : null}
-      {isPractice && dialog === 'withdraw' ? <PayoutWithdrawPanel onClose={() => setDialog(null)} /> : null}
+      {!isDemo && !isPractice && isSignedIn ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            data-testid="wallet-deposit"
+            disabled={!realDepositsOn}
+            title="Deposit to your REAL wallet with M-Pesa"
+            onClick={openRealDeposit}
+          >
+            Deposit
+            {realDepositsOn ? <span className="text-[10px] font-medium opacity-80">· M-Pesa</span> : null}
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={!(realWithdrawalsOn && isSignedIn)}
+            data-testid="wallet-withdraw"
+            title="Withdraw your REAL balance to M-Pesa"
+            onClick={openRealWithdraw}
+          >
+            Withdraw
+            {realWithdrawalsOn ? <span className="text-[10px] font-medium opacity-80">· M-Pesa</span> : null}
+          </Button>
+        </div>
+      ) : null}
+      {!isDemo && dialog === 'deposit' ? <RealDepositPanel onClose={() => setDialog(null)} /> : null}
+      {(isPractice || !isDemo) && dialog === 'withdraw' ? <PayoutWithdrawPanel onClose={() => setDialog(null)} /> : null}
       <div className="mt-6">
         <Tabs
           value={tab}
@@ -263,7 +298,9 @@ export function WalletPanels() {
                   <p className="mt-2 text-sm text-mist">
                     {isDemo
                       ? 'Bank transfer, mobile money, and crypto forms credit DEMO virtual funds only.'
-                      : 'Real deposits are closed.'}
+                      : realDepositsOn
+                        ? 'Deposit with M-Pesa STK Push. Funds credit your REAL wallet after confirmation.'
+                        : 'Real deposits are temporarily unavailable.'}
                   </p>
                 </Card>
                 <Card>

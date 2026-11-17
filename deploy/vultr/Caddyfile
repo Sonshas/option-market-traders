@@ -33,15 +33,9 @@ optionmarkettraders.com {
 	# 	reverse_proxy localhost:3001
 	# }
 
-	# MegaPay webhook, shared with vastderiv-traders.com. Proxied to the Supabase Edge Function
-	# megapay-webhook, which processes OMT- deposits and forwards everything else to vastderiv.
-	# Must stay above the SPA fallback below.
-	handle /api/megapay/webhook {
-		rewrite * /functions/v1/megapay-webhook
-		reverse_proxy https://wkfyavcjjuyzvyeprklz.supabase.co {
-			header_up Host wkfyavcjjuyzvyeprklz.supabase.co
-		}
-	}
+	# MegaPay webhooks are NOT hosted on this site. The MegaPay dashboard webhook is
+	# https://binaryderivpilot.com/api/megapay/webhook. REAL deposits here settle by
+	# megapay-status polling (/transactionstatus), not by a local /api/megapay/webhook.
 
 	# Safaricom Daraja STK Push callback (CallBackURL), proxied to the Supabase Edge Function mpesa-callback.
 	# Must stay above the SPA fallback below and must never redirect or challenge Safaricom's POST.

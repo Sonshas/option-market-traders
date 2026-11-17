@@ -32,9 +32,10 @@ if ($ServerIp.Contains(':')) {
   $scpHost = $sshTarget
 }
 
-Write-Host '==> Uploading Caddyfile (requires root on server)' -ForegroundColor Cyan
-scp @sshOpts $Caddyfile "root@${scpHost}:/tmp/Caddyfile.new"
-if ($LASTEXITCODE -ne 0) { throw 'scp failed' }
+Write-Host '==> Uploading Caddyfile (requires root SSH on server)' -ForegroundColor Cyan
+$rootScp = if ($ServerIp.Contains(':')) { "root@[$ServerIp]" } else { "root@$ServerIp" }
+scp @sshOpts $Caddyfile "${rootScp}:/tmp/Caddyfile.new"
+if ($LASTEXITCODE -ne 0) { throw 'scp to root failed — use ssh root@SERVER with your root key, or run sync-caddy.ps1 after root login works' }
 
 $remote = @(
   'set -e',

@@ -1,9 +1,5 @@
-import { DEFAULT_DEPOSIT_PROVIDER, parseDepositProvider, type DepositProvider } from '@/domain/daraja'
-import { getSupabase } from '@/lib/supabase'
+import { parseDepositProvider, type DepositProvider } from '@/domain/daraja'
 import {
-  UNAVAILABLE,
-  errorMessage,
-  mapState,
   megapayService,
   type MegapayDepositConfig,
   type MegapayDepositState,
@@ -11,77 +7,49 @@ import {
 } from '@/services/megapay'
 
 /**
- * REAL M-Pesa deposits. The active provider comes from the DEPOSIT_PROVIDER Edge Function secret
- * (reported by mpesa-deposit GET), so switching between Daraja and MegaPay needs no web deploy.
+ * REAL M-Pesa deposits via MegaPay. Daraja deposit functions stay deployed only as a
+ * disabled fallback; the live site always uses megapay-deposit / megapay-status.
  */
 export interface DepositConfig extends MegapayDepositConfig {
   provider: DepositProvider
+  /** M-Pesa Till shown to the member (MegaPay). Daraja used Paybill. */
+  till: string | null
   paybill: string | null
 }
 
 export type DepositState = MegapayDepositState
 
-const DARAJA_FUNCTIONS = { start: 'mpesa-deposit', status: 'mpesa-status' } as const
-
 export function resolveDepositProvider(raw: unknown): DepositProvider {
   const provider = raw && typeof raw === 'object' ? (raw as Record<string, unknown>).provider : undefined
-  return typeof provider === 'string' ? parseDepositProvider(provider) : DEFAULT_DEPOSIT_PROVIDER
+  return typeof provider === 'string' ? parseDepositProvider(provider) : 'megapay'
 }
 
-export function depositMethodLabel(config: Pick<DepositConfig, 'provider' | 'paybill'>): string {
-  return config.provider === 'daraja' && config.paybill ? `M-Pesa (Paybill ${config.paybill})` : 'M-Pesa'
+export function depositMethodLabel(config: Pick<DepositConfig, 'provider' | 'till' | 'paybill'>): string {
+  if (config.provider === 'megapay' && config.till) return `M-Pesa (Till ${config.till})`
+  if (config.provider === 'daraja' && config.paybill) return `M-Pesa (Paybill ${config.paybill})`
+  return 'M-Pesa'
 }
 
 export const depositService = {
   async getConfig(): Promise<Result<DepositConfig>> {
-    const client = getSupabase()
-    if (!client) return { ok: false, error: UNAVAILABLE }
-    const { data, error } = await client.functions.invoke<Record<string, unknown>>(DARAJA_FUNCTIONS.start, { method: 'GET' })
-    if (error || !data) return { ok: false, error: await errorMessage(error) }
-
-    if (resolveDepositProvider(data) === 'megapay') {
-      const fallback = await megapayService.getConfig()
-      return fallback.ok ? { ok: true, data: { ...fallback.data, provider: 'megapay', paybill: null } } : fallback
-    }
-    const quick = Array.isArray(data.quick_amounts)
-      ? data.quick_amounts.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
-      : undefined
+    const fallback = await megapayService.getConfig()
+    if (!fallback.ok) return fallback
     return {
       ok: true,
       data: {
-        provider: 'daraja',
-        paybill: typeof data.paybill === 'string' && data.paybill ? data.paybill : null,
-        enabled: data.enabled === true,
-        kesPerUsd: Number(data.kes_per_usd),
-        minKes: Number(data.min_kes),
-        maxKes: Number(data.max_kes),
-        quickAmounts: quick && quick.length ? quick : undefined,
-        message: (data.message as string | null) ?? null,
+        ...fallback.data,
+        provider: 'megapay',
+        till: fallback.data.till ?? null,
+        paybill: null,
       },
     }
   },
 
-  async startDeposit(provider: DepositProvider, amountKes: number, phone: string): Promise<Result<DepositState>> {
-    if (provider === 'megapay') return megapayService.startDeposit(amountKes, phone)
-    const client = getSupabase()
-    if (!client) return { ok: false, error: UNAVAILABLE }
-    const { data, error } = await client.functions.invoke<Record<string, unknown>>(DARAJA_FUNCTIONS.start, {
-      method: 'POST',
-      body: { amount_kes: amountKes, phone },
-    })
-    if (error || !data) return { ok: false, error: await errorMessage(error) }
-    return { ok: true, data: mapState(data) }
+  async startDeposit(_provider: DepositProvider, amountKes: number, phone: string): Promise<Result<DepositState>> {
+    return megapayService.startDeposit(amountKes, phone)
   },
 
-  async checkStatus(provider: DepositProvider, depositId: string): Promise<Result<DepositState>> {
-    if (provider === 'megapay') return megapayService.checkStatus(depositId)
-    const client = getSupabase()
-    if (!client) return { ok: false, error: UNAVAILABLE }
-    const { data, error } = await client.functions.invoke<Record<string, unknown>>(DARAJA_FUNCTIONS.status, {
-      method: 'POST',
-      body: { deposit_id: depositId },
-    })
-    if (error || !data) return { ok: false, error: await errorMessage(error) }
-    return { ok: true, data: mapState(data) }
+  async checkStatus(_provider: DepositProvider, depositId: string): Promise<Result<DepositState>> {
+    return megapayService.checkStatus(depositId)
   },
 }
